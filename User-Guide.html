@@ -1,0 +1,2261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto Risk Engine — User Guide</title>
+<style>
+  :root {
+    --primary: #1f3b73;
+    --primary-light: #2e5cb8;
+    --danger: #c8102e;
+    --warning: #b06f00;
+    --success: #1d6f42;
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --text: #1a1f2c;
+    --muted: #5a6478;
+    --border: #d8dde6;
+    --code-bg: #1f2433;
+    --code-text: #e9eef9;
+    --highlight: #fff8d6;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    font-size: 16px;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 100vh;
+  }
+
+  /* Sidebar */
+  aside {
+    background: var(--primary);
+    color: #fff;
+    padding: 32px 22px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  aside h1 {
+    margin: 0 0 6px;
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+
+  aside .subtitle {
+    font-size: 13px;
+    opacity: 0.75;
+    margin-bottom: 28px;
+  }
+
+  aside nav ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: nav-counter;
+  }
+
+  aside nav li {
+    counter-increment: nav-counter;
+    margin: 4px 0;
+  }
+
+  aside nav a {
+    display: block;
+    padding: 8px 12px 8px 38px;
+    color: rgba(255,255,255,0.85);
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 14px;
+    position: relative;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  aside nav a::before {
+    content: counter(nav-counter);
+    position: absolute;
+    left: 10px;
+    top: 8px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    text-align: center;
+    line-height: 22px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  aside nav a:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+  }
+
+  aside .footer-note {
+    margin-top: 32px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.55);
+    border-top: 1px solid rgba(255,255,255,0.15);
+    padding-top: 16px;
+  }
+
+  /* Main content */
+  main {
+    padding: 56px 64px 96px;
+    max-width: 980px;
+  }
+
+  section {
+    margin-bottom: 72px;
+    scroll-margin-top: 24px;
+  }
+
+  section h2 {
+    font-size: 28px;
+    margin: 0 0 4px;
+    color: var(--primary);
+    border-bottom: 3px solid var(--primary);
+    padding-bottom: 8px;
+    display: inline-block;
+  }
+
+  section h3 {
+    font-size: 19px;
+    margin: 32px 0 8px;
+    color: var(--text);
+  }
+
+  section h4 {
+    font-size: 16px;
+    margin: 22px 0 6px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  section p { margin: 12px 0; }
+
+  section ul, section ol { padding-left: 22px; }
+  section li { margin: 6px 0; }
+
+  .lede {
+    font-size: 17px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  /* Code blocks */
+  code {
+    background: #eef1f6;
+    color: var(--primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 0.92em;
+  }
+
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 16px 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  pre code { background: transparent; color: inherit; padding: 0; }
+
+  /* Callout boxes */
+  .callout {
+    border-left: 4px solid var(--primary-light);
+    background: #eef3ff;
+    padding: 14px 18px;
+    border-radius: 6px;
+    margin: 18px 0;
+    font-size: 15px;
+  }
+  .callout.warning {
+    border-color: var(--warning);
+    background: #fff5e0;
+  }
+  .callout.danger {
+    border-color: var(--danger);
+    background: #fde9ec;
+  }
+  .callout.success {
+    border-color: var(--success);
+    background: #e6f3ec;
+  }
+  .callout strong { color: var(--primary); }
+  .callout.warning strong { color: var(--warning); }
+  .callout.danger strong { color: var(--danger); }
+  .callout.success strong { color: var(--success); }
+
+  /* Numbered steps */
+  .step {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin: 14px 0;
+    position: relative;
+  }
+  .step .step-num {
+    position: absolute;
+    top: -12px;
+    left: 18px;
+    background: var(--primary);
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .step h4 {
+    margin-top: 6px;
+    color: var(--text);
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 17px;
+  }
+
+  /* OS tabs (no JS — show all three with labels) */
+  .os-block {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 12px 0;
+  }
+  .os-block h4 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: var(--primary);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  /* Glossary */
+  dl { margin: 0; }
+  dt {
+    font-weight: 700;
+    color: var(--primary);
+    margin-top: 16px;
+  }
+  dd { margin: 4px 0 0; color: var(--text); }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 15px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    background: #eef1f6;
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  /* Highlight inline */
+  .kbd {
+    display: inline-block;
+    padding: 2px 7px;
+    background: #e6e9ef;
+    border: 1px solid #c2c8d3;
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.85em;
+  }
+
+  /* Mock UI for the app walkthrough */
+  .ui-mock {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 8px;
+    padding: 18px;
+    margin: 14px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .ui-mock .label {
+    display: inline-block;
+    background: var(--primary);
+    color: #fff;
+    padding: 1px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 8px;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 32px 0;
+  }
+
+  /* Responsive */
+  @media (max-width: 880px) {
+    .layout { grid-template-columns: 1fr; }
+    aside {
+      position: static;
+      height: auto;
+      padding: 24px;
+    }
+    main { padding: 32px 24px 64px; }
+  }
+
+  /* Print */
+  @media print {
+    aside { display: none; }
+    .layout { grid-template-columns: 1fr; }
+    main { padding: 0; max-width: none; }
+    pre { white-space: pre-wrap; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── Sidebar ─────────────────────────────────────── -->
+  <aside>
+    <h1>Crypto Risk Engine</h1>
+    <div class="subtitle">User Guide for Beginners</div>
+    <nav>
+      <ol>
+        <li><a href="#welcome">What is this?</a></li>
+        <li><a href="#what-you-need">What you need</a></li>
+        <li><a href="#install-python">Install Python</a></li>
+        <li><a href="#open-terminal">Open a terminal</a></li>
+        <li><a href="#setup">Set up the project</a></li>
+        <li><a href="#run-app">Run the web app</a></li>
+        <li><a href="#using-app">Using the web app</a></li>
+        <li><a href="#understanding">Understanding the numbers</a></li>
+        <li><a href="#troubleshoot">If something goes wrong</a></li>
+        <li><a href="#glossary">Glossary</a></li>
+        <li><a href="#changelog">Project changelog</a></li>
+      </ol>
+    </nav>
+    <div class="footer-note">
+      Tip: scroll through each section in order the first time. After that, jump
+      to whichever section you need.
+    </div>
+  </aside>
+
+  <!-- ── Main ────────────────────────────────────────── -->
+  <main>
+
+    <!-- 1 ─ Welcome -->
+    <section id="welcome">
+      <h2>1. What is this?</h2>
+      <p class="lede">
+        This project is a small program that looks at crypto prices (Bitcoin,
+        Ethereum, and so on) and tells you how risky a portfolio is.
+      </p>
+      <p>
+        Think of it like a weather forecast — but for your investments. You
+        tell the program <em>what coins you hold</em> and <em>how much of
+        each</em>, and it answers questions like:
+      </p>
+      <ul>
+        <li>"On a bad day, how much could I lose?"</li>
+        <li>"How bad would the worst day in 100 days look?"</li>
+        <li>"How much has this portfolio gone up or down over time?"</li>
+      </ul>
+      <p>
+        It comes in two flavours:
+      </p>
+      <ul>
+        <li>A <strong>web app</strong> that opens in your browser. Easiest.</li>
+        <li>A <strong>one-shot script</strong> that prints a summary and saves
+          some files. Good for quick checks.</li>
+      </ul>
+      <p>
+        This guide covers both, but the web app is what we recommend.
+      </p>
+      <div class="callout">
+        <strong>You do not need to know any code.</strong> The whole setup is
+        copy, paste, press <span class="kbd">Enter</span>. We'll walk through
+        every step.
+      </div>
+    </section>
+
+    <!-- 2 ─ What you need -->
+    <section id="what-you-need">
+      <h2>2. What you need</h2>
+      <ul>
+        <li>A laptop running <strong>Windows</strong>, <strong>macOS</strong>,
+          or <strong>Linux</strong>.</li>
+        <li>An <strong>internet connection</strong> (only for the first-time
+          setup, and whenever you fetch fresh prices).</li>
+        <li>About <strong>15 minutes</strong> of setup. After that, opening the
+          app takes 5 seconds.</li>
+        <li>The project folder (named <code>risk-management</code>) saved
+          somewhere on your computer — for example on your Desktop.</li>
+      </ul>
+      <div class="callout warning">
+        <strong>Heads up:</strong> we are going to use a tool called the
+        <em>Terminal</em>. It looks like a black or white window where you type
+        commands. Don't worry — you won't break anything by typing in it. Each
+        command we use is shown in a dark grey box. You can copy it and paste
+        it directly.
+      </div>
+    </section>
+
+    <!-- 3 ─ Install Python -->
+    <section id="install-python">
+      <h2>3. Install Python</h2>
+      <p class="lede">
+        Python is the language this program is written in. You only need to do
+        this step <strong>once</strong>.
+      </p>
+
+      <div class="os-block">
+        <h4>On Windows</h4>
+        <ol>
+          <li>Open your browser and go to
+            <code>https://www.python.org/downloads</code>.</li>
+          <li>Click the big yellow "Download Python 3.x" button.</li>
+          <li>Open the downloaded file (<code>.exe</code>).</li>
+          <li><strong>Important:</strong> on the first screen, tick the box
+            that says <em>"Add Python to PATH"</em> at the bottom. Then click
+            <em>Install Now</em>.</li>
+          <li>When it finishes, click <em>Close</em>.</li>
+        </ol>
+      </div>
+
+      <div class="os-block">
+        <h4>On macOS</h4>
+        <ol>
+          <li>Open your browser and go to
+            <code>https://www.python.org/downloads</code>.</li>
+          <li>Click "Download Python 3.x".</li>
+          <li>Open the downloaded <code>.pkg</code> file and follow the
+            installer (just keep clicking <em>Continue</em> and
+            <em>Install</em>).</li>
+        </ol>
+      </div>
+
+      <div class="os-block">
+        <h4>On Linux</h4>
+        <p>
+          Python is usually already installed. If not, open a terminal and run:
+        </p>
+        <pre><code>sudo apt update
+sudo apt install python3 python3-venv python3-pip</code></pre>
+      </div>
+
+      <h3>Check that Python works</h3>
+      <p>
+        Open a terminal (next section explains how) and type:
+      </p>
+      <pre><code>python3 --version</code></pre>
+      <p>
+        You should see something like <code>Python 3.12.3</code>. Any version
+        starting with <code>3.10</code> or higher is fine.
+      </p>
+      <div class="callout warning">
+        <strong>If you see "command not found":</strong> Python wasn't added
+        correctly. On Windows, re-run the installer and remember to tick
+        <em>"Add Python to PATH"</em>. On Mac, restart the Terminal.
+      </div>
+    </section>
+
+    <!-- 4 ─ Open a terminal -->
+    <section id="open-terminal">
+      <h2>4. Open a terminal</h2>
+      <p class="lede">
+        The terminal is just a text window where you type commands. Here is
+        how to open it on each system.
+      </p>
+
+      <div class="os-block">
+        <h4>On Windows</h4>
+        <ol>
+          <li>Press <span class="kbd">Win</span> + <span class="kbd">R</span>
+            on the keyboard.</li>
+          <li>Type <code>powershell</code> and press
+            <span class="kbd">Enter</span>.</li>
+        </ol>
+        <p>A blue window will open. That's the terminal.</p>
+      </div>
+
+      <div class="os-block">
+        <h4>On macOS</h4>
+        <ol>
+          <li>Press <span class="kbd">Cmd</span> + <span class="kbd">Space</span>.</li>
+          <li>Type <code>Terminal</code> and press
+            <span class="kbd">Enter</span>.</li>
+        </ol>
+      </div>
+
+      <div class="os-block">
+        <h4>On Linux</h4>
+        <p>
+          Press <span class="kbd">Ctrl</span> + <span class="kbd">Alt</span> +
+          <span class="kbd">T</span>, or open the application menu and look
+          for "Terminal".
+        </p>
+      </div>
+
+      <h3>How to copy and paste in the terminal</h3>
+      <ul>
+        <li><strong>Windows / Linux:</strong> right-click to paste. Or
+          <span class="kbd">Ctrl</span> + <span class="kbd">Shift</span> +
+          <span class="kbd">V</span>.</li>
+        <li><strong>macOS:</strong> <span class="kbd">Cmd</span> +
+          <span class="kbd">V</span>.</li>
+      </ul>
+      <p>
+        Copy any code from this guide (highlight it, right-click, Copy), then
+        paste it into the terminal and press <span class="kbd">Enter</span>.
+      </p>
+    </section>
+
+    <!-- 5 ─ Setup -->
+    <section id="setup">
+      <h2>5. Set up the project</h2>
+      <p class="lede">
+        These four steps prepare the project. Do them once. After that,
+        starting the app takes a single command.
+      </p>
+
+      <div class="step">
+        <span class="step-num">1</span>
+        <h4>Go to the project folder</h4>
+        <p>
+          In the terminal, type <code>cd</code> (which means "change directory")
+          followed by the path to where the <code>risk-management</code> folder
+          lives. For example, if it is on your Desktop:
+        </p>
+        <p><strong>Windows:</strong></p>
+        <pre><code>cd Desktop\risk-management</code></pre>
+        <p><strong>macOS / Linux:</strong></p>
+        <pre><code>cd ~/Desktop/risk-management</code></pre>
+        <div class="callout">
+          <strong>Easy trick:</strong> in your file manager, open the
+          <code>risk-management</code> folder, then drag and drop it into the
+          terminal window after typing <code>cd </code> (with a space). The
+          full path appears automatically.
+        </div>
+      </div>
+
+      <div class="step">
+        <span class="step-num">2</span>
+        <h4>Create an isolated workspace</h4>
+        <p>
+          We make a small "sandbox" so this project keeps its tools separate
+          from the rest of your computer.
+        </p>
+        <pre><code>python3 -m venv .venv</code></pre>
+        <p>
+          Wait until the prompt comes back. A new hidden folder called
+          <code>.venv</code> appears in the project. You only do this once.
+        </p>
+      </div>
+
+      <div class="step">
+        <span class="step-num">3</span>
+        <h4>Activate the workspace</h4>
+        <p>You do this <strong>every time</strong> you open a new terminal.</p>
+        <p><strong>Windows (PowerShell):</strong></p>
+        <pre><code>.\.venv\Scripts\Activate.ps1</code></pre>
+        <p><strong>macOS / Linux:</strong></p>
+        <pre><code>source .venv/bin/activate</code></pre>
+        <p>
+          You'll know it worked when <code>(.venv)</code> appears at the
+          beginning of the line in your terminal.
+        </p>
+        <div class="callout warning">
+          <strong>Windows only:</strong> if PowerShell complains about scripts
+          being disabled, run this command first, then try again:
+          <pre><code>Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned</code></pre>
+          Answer <code>Y</code> when it asks.
+        </div>
+      </div>
+
+      <div class="step">
+        <span class="step-num">4</span>
+        <h4>Install the project's tools</h4>
+        <p>
+          This downloads everything the program needs (about 200 MB of files).
+          Only the first time.
+        </p>
+        <pre><code>pip install --upgrade pip
+pip install -r requirements.txt
+pip install -e .</code></pre>
+        <p>
+          You'll see lots of messages scrolling. That's normal. When the
+          prompt comes back without errors, you're ready.
+        </p>
+      </div>
+
+      <div class="callout success">
+        <strong>You're done with setup.</strong> Next time you want to use the
+        app, all you'll need is:
+        <ol>
+          <li>Open the terminal</li>
+          <li><code>cd</code> into the project folder</li>
+          <li>Activate the workspace (step 3)</li>
+          <li>Run the app (next section)</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- 6 ─ Run the app -->
+    <section id="run-app">
+      <h2>6. Run the web app</h2>
+      <p class="lede">
+        With the workspace activated <code>(.venv)</code> visible in your
+        terminal, type:
+      </p>
+      <pre><code>streamlit run app.py</code></pre>
+      <p>
+        After a few seconds your browser opens automatically at an address
+        like <code>http://localhost:8501</code>. That's the app.
+      </p>
+      <div class="callout">
+        <strong>To stop the app:</strong> go back to the terminal and press
+        <span class="kbd">Ctrl</span> + <span class="kbd">C</span>. Close the
+        browser tab if you wish.
+      </div>
+
+      <h3>Optional: the one-shot command-line demo</h3>
+      <p>
+        If you'd rather not use the web app, run:
+      </p>
+      <pre><code>python run_demo.py</code></pre>
+      <p>
+        This single command does <strong>everything</strong> in one go:
+        fetches prices, computes VaR / CVaR / drawdown <em>and</em> the new
+        backtesting checks (Phase 3). It prints a summary in the terminal and
+        saves every chart, table, and JSON file under the
+        <code>outputs/</code> folder. Open that folder in your file manager
+        to see them.
+      </p>
+    </section>
+
+    <!-- 7 ─ Using the app -->
+    <section id="using-app">
+      <h2>7. Using the web app</h2>
+      <p class="lede">
+        The web app has a sidebar on the left for settings and a main area on
+        the right for results. Here's what each part does.
+      </p>
+
+      <h3>The sidebar (left)</h3>
+      <div class="ui-mock">
+        <p>
+          <span class="label">Data source</span>
+          Where to get prices. <strong>CoinGecko</strong> is free and reliable.
+          If it ever stops working, leave the "Fall back to yfinance" box
+          ticked and the app will switch automatically.
+        </p>
+        <p>
+          <span class="label">Start date / End date</span>
+          The time window to study. Longer windows give more data; shorter
+          windows reflect recent conditions. <em>2021-01-01</em> to today is a
+          good default.
+        </p>
+        <p>
+          <span class="label">Return method</span>
+          Leave this on <em>simple</em> unless you know what log returns are.
+        </p>
+        <p>
+          <span class="label">Initial capital</span>
+          Pretend you put this much money into the portfolio. Numbers later
+          on (like dollar losses) use this amount.
+        </p>
+        <p>
+          <span class="label">Confidence level</span>
+          A slider from 80% to 99.9%. The higher you set it, the rarer (and
+          worse) the loss the app reports. <em>95%</em> is the standard.
+        </p>
+        <p>
+          <span class="label">Time horizon</span>
+          How many days into the future the loss applies to. <em>1</em> means
+          a one-day loss. The number for longer horizons is an approximation,
+          so don't go past a few weeks.
+        </p>
+        <p>
+          <span class="label">VaR / CVaR methods</span>
+          Tick which methods you want to compare. Leave them all on the first
+          time.
+        </p>
+      </div>
+
+      <h3>The portfolio editor</h3>
+      <p>
+        A small table where you list each coin you own and how much of the
+        portfolio it represents (its <em>weight</em>). The default is BTC 50%
+        / ETH 30% / SOL 20%. To change:
+      </p>
+      <ul>
+        <li>Click a number in the <em>Weight</em> column and type a new one.</li>
+        <li>Add a row by scrolling to the bottom of the table — there is an
+          empty row marked "+".</li>
+        <li>Delete a row by selecting it and pressing
+          <span class="kbd">Delete</span>.</li>
+      </ul>
+      <p>
+        Weights should add up to 1.0 (i.e. 100%). If they don't, leave
+        <em>"Auto-normalize weights"</em> on in the sidebar — the app will
+        scale them for you.
+      </p>
+
+      <h3>The Run button</h3>
+      <p>
+        After every change to the sidebar or the portfolio table, click
+        <strong>Run risk analysis</strong>. The app fetches the prices, does
+        the math, and updates everything below.
+      </p>
+
+      <h3>The result tabs</h3>
+      <table>
+        <tr><th>Tab</th><th>What it shows</th></tr>
+        <tr>
+          <td><strong>Risk summary</strong></td>
+          <td>A full table of every risk number for your portfolio. There is a
+            "Download CSV" button under it.</td>
+        </tr>
+        <tr>
+          <td><strong>Distribution</strong></td>
+          <td>A histogram of daily returns. Red dashed line = VaR threshold.
+            Red shaded area = CVaR tail. The most informative single chart.</td>
+        </tr>
+        <tr>
+          <td><strong>Cumulative</strong></td>
+          <td>How the portfolio's total return changed over time.</td>
+        </tr>
+        <tr>
+          <td><strong>Drawdown</strong></td>
+          <td>How far the portfolio dropped below its previous high. Red
+            valleys are bad periods.</td>
+        </tr>
+        <tr>
+          <td><strong>Data</strong></td>
+          <td>The raw prices, asset returns, and portfolio time series, with
+            download buttons for each.</td>
+        </tr>
+        <tr>
+          <td><strong>Backtesting &amp; Model Validation</strong></td>
+          <td>Pretends each day in the past was "today", asks the chosen
+            VaR method to predict the next <em>h</em> days of risk
+            (<em>h</em> = the Horizon input — 1 for daily, 7 for weekly,
+            etc.), then compares the prediction against what actually
+            happened over those <em>h</em> days. Shows how many times
+            the loss exceeded the prediction, runs three standard
+            statistical checks, and gives a green / yellow / red
+            traffic-light verdict. See section 8 for what the numbers
+            mean.</td>
+        </tr>
+        <tr>
+          <td><strong>🎲 Monte Carlo Scenario Engine</strong></td>
+          <td>Phase 4 tab. Instead of looking at the past, it
+            <em>simulates</em> thousands of plausible futures from a
+            joint return model (Normal or Student-t), then reports the
+            simulated VaR and CVaR, plots the loss distribution, draws a
+            fan of portfolio value paths over the next 30 days, and
+            compares Historical / Gaussian / Cornish-Fisher / Normal MC
+            / Student-t MC side-by-side in one table. See section 8 for
+            what each piece means.</td>
+        </tr>
+        <tr>
+          <td><strong>🎯 Portfolio Optimization</strong></td>
+          <td>The newest tab (Phase 5). Instead of just measuring risk,
+            this one <em>chooses weights</em>. Pick a scenario source
+            (Historical / Normal MC / Student-t MC), an objective
+            (minimum-CVaR, max return under a CVaR cap, minimum CVaR for
+            a target return, or the full CVaR efficient frontier), and
+            constraints (long-only, min/max weight, optional cash). The
+            app solves the optimisation, shows the new weights, and
+            puts them head-to-head with your current portfolio. See
+            section 8 for what the numbers mean.</td>
+        </tr>
+      </table>
+
+      <h3>The Backtesting tab — how to use it</h3>
+      <p>
+        After you click <strong>Run risk analysis</strong>, open this tab and:
+      </p>
+      <ol>
+        <li>Pick a <strong>VaR method</strong> to test, or choose
+          <em>"Compare All"</em> to see all three side by side.</li>
+        <li>Choose a <strong>confidence level</strong> (95% is the standard)
+          and a <strong>rolling window</strong> (252 days is the regulatory
+          standard — about one trading year).</li>
+        <li>Choose a <strong>Horizon (days)</strong>:
+          <ul>
+            <li><strong>1</strong> — classic one-step-ahead daily backtest.
+              VaR forecast is for tomorrow, realised return is tomorrow's
+              return.</li>
+            <li><strong>7</strong> — weekly. VaR forecast is for the next
+              7 days, realised return is the realised 7-day return. The
+              chart and table both say <em>"7-day VaR Backtest"</em>.</li>
+            <li><strong>10, 30, …</strong> — for monthly or regulatory
+              horizons.</li>
+          </ul>
+          Picking the horizon to match your headline VaR cards keeps the
+          two views consistent.</li>
+        <li>Click <strong>Run Backtest</strong>.</li>
+      </ol>
+      <p>
+        The results stay on screen even if you switch tabs or download files.
+        Every chart and table can be downloaded with the
+        <em>"⬇️ Download"</em> buttons.
+      </p>
+
+      <h3>The Monte Carlo tab — how to use it</h3>
+      <p>
+        Backtesting checks the past. Monte Carlo asks <em>"what could
+        plausibly happen next?"</em> by simulating thousands of futures.
+        Open the <strong>🎲 Monte Carlo Scenario Engine</strong> tab after
+        you've run a risk analysis and:
+      </p>
+      <ol>
+        <li>Pick a <strong>Distribution</strong>:
+          <ul>
+            <li><strong>Normal</strong> — assumes returns are bell-shaped
+              (light tails). Usually too optimistic for crypto.</li>
+            <li><strong>Student-t</strong> — heavy-tailed, much closer to
+              what crypto markets actually do. Recommended.</li>
+            <li><strong>Compare Normal vs Student-t</strong> — runs both
+              and overlays them so you can see the difference.</li>
+          </ul></li>
+        <li>Choose <strong>Number of scenarios</strong> (5,000 is a good
+          default; more is smoother but slower) and a <strong>Horizon
+          (days)</strong>. The horizon defaults to whatever you picked in
+          the sidebar.</li>
+        <li>If you picked Student-t, set <strong>df</strong> (degrees of
+          freedom). 5 is a sensible default for crypto. Lower = heavier
+          tails.</li>
+        <li>Set <strong>n_paths</strong> and <strong>Path horizon
+          (days)</strong> for the portfolio-value path chart. 500 paths
+          over 30 days is the default.</li>
+        <li>Click <strong>Run Monte Carlo</strong>.</li>
+      </ol>
+      <p>
+        You'll see five KPI cards (MC VaR, MC CVaR, mean / worst simulated
+        return, number of scenarios), the simulated return distribution
+        with VaR and CVaR markers, a fan chart of plausible portfolio
+        paths over the next month, and a final comparison table that
+        lines up Historical, Gaussian, Cornish-Fisher, Normal MC, and
+        Student-t MC at the chosen horizon — so you can immediately see
+        which method is the most conservative.
+      </p>
+
+      <h3>The Portfolio Optimization tab — how to use it</h3>
+      <p>
+        The first six tabs <em>measure</em> risk. This one <em>acts on
+        it</em> — it asks "given these scenarios, which weights should I
+        actually hold?" and answers with a new set of percentages.
+      </p>
+      <ol>
+        <li>Click <strong>Run risk analysis</strong> in the sidebar first
+          (this loads prices and your current weights). Then open the
+          <strong>🎯 Portfolio Optimization</strong> tab.</li>
+        <li>Pick a <strong>Scenario source</strong>:
+          <ul>
+            <li><strong>Historical</strong> — uses the real return
+              history. No simulation. Best when the future will look
+              roughly like the past.</li>
+            <li><strong>Normal Monte Carlo</strong> — uses 5,000 (by
+              default) simulated futures drawn from a Normal model.
+              Smooth baseline, but optimistic for crypto.</li>
+            <li><strong>Student-t Monte Carlo</strong> — same idea, but
+              with fat tails. Recommended for crypto.</li>
+          </ul></li>
+        <li>Set the <strong>Horizon (days)</strong>, <strong>MC scenarios</strong>,
+          <strong>Confidence level</strong>, <strong>Random seed</strong>,
+          and (for Student-t) <strong>df</strong>.</li>
+        <li>Pick an <strong>Objective</strong>:
+          <ul>
+            <li><strong>Minimize CVaR</strong> — the safest portfolio
+              that still adds up to 100%.</li>
+            <li><strong>Max return under CVaR cap</strong> — earn as
+              much as possible while keeping CVaR below the cap you
+              choose.</li>
+            <li><strong>Min CVaR for target return</strong> — the
+              <em>least-risky</em> portfolio that still earns at least
+              your target return.</li>
+            <li><strong>CVaR efficient frontier</strong> — a sweep of
+              the trade-off between risk and reward.</li>
+            <li><strong>Compare all</strong> — runs every objective
+              above and lines them up next to your current portfolio.</li>
+          </ul></li>
+        <li>Set <strong>Constraints</strong>:
+          <ul>
+            <li><strong>Long-only</strong> on (default) — no
+              short-selling.</li>
+            <li><strong>Min / max weight</strong> per asset — caps any
+              single position. Setting max = 0.5 prevents the optimiser
+              from going all-in on one coin.</li>
+            <li><strong>Include cash asset</strong> — adds a CASH
+              column that earns a constant per-horizon return. Often
+              optimal when other assets look risky.</li>
+            <li><strong>CVaR cap</strong> and <strong>Target return</strong>
+              — only active for the objectives that need them.</li>
+          </ul></li>
+        <li>Click <strong>▶️ Run optimization</strong>.</li>
+      </ol>
+      <p>
+        You'll see five KPI cards (Status, Expected return, Volatility,
+        VaR, CVaR), a sorted table of the new weights, a bar chart of
+        the same weights, a current-vs-optimised risk-comparison table
+        and chart, an allocation-comparison chart, and (if you picked
+        the frontier) a scatter of the CVaR efficient frontier with the
+        min-CVaR and max-return points highlighted.
+      </p>
+      <p>
+        Every chart and table has a <strong>⬇️ Download</strong> button.
+      </p>
+      <div class="callout">
+        <strong>If the optimiser says <em>"infeasible"</em></strong>:
+        your constraints rule out every possible portfolio at once. The
+        most common cause is a target return that no combination of your
+        assets can achieve. Lower the target, raise the CVaR cap, or
+        relax min/max weight bounds and try again — the app will not
+        crash, it just shows the status and a one-line message.
+      </div>
+    </section>
+
+    <!-- 8 ─ Understanding -->
+    <section id="understanding">
+      <h2>8. Understanding the numbers</h2>
+      <p class="lede">
+        Here is a plain-English explanation of every metric the app shows.
+      </p>
+
+      <h3>VaR — Value at Risk</h3>
+      <p>
+        "Out of 100 days, how bad is the 5th-worst day likely to be?"
+      </p>
+      <p>
+        If the app says <strong>VaR 95% = 4.2% ($4,200)</strong>, that means:
+      </p>
+      <ul>
+        <li>On 95% of days you should not lose more than 4.2% of your
+          portfolio.</li>
+        <li>On 5% of days — about 1 in 20 — you might lose <em>at least</em>
+          that much.</li>
+        <li>On a $100,000 portfolio, that is at least $4,200.</li>
+      </ul>
+
+      <h3>CVaR — Conditional Value at Risk (also called Expected Shortfall)</h3>
+      <p>
+        "On those bad days, how bad does it get on average?"
+      </p>
+      <p>
+        VaR tells you the threshold. CVaR tells you the <em>average</em> of
+        all the days that crossed it. CVaR is always at least as big as VaR.
+      </p>
+      <p>
+        If VaR is the front door of bad days, CVaR is the average room
+        behind that door.
+      </p>
+
+      <h3>The three VaR methods, explained</h3>
+      <table>
+        <tr><th>Method</th><th>What it does</th><th>When to trust it</th></tr>
+        <tr>
+          <td><strong>Historical</strong></td>
+          <td>Sorts past returns from worst to best and reads off the
+            tail.</td>
+          <td>When the future will look like the past.</td>
+        </tr>
+        <tr>
+          <td><strong>Gaussian</strong></td>
+          <td>Pretends returns follow a perfect bell curve.</td>
+          <td>For relatively calm assets. Often <em>too optimistic</em> for
+            crypto.</td>
+        </tr>
+        <tr>
+          <td><strong>Cornish-Fisher</strong></td>
+          <td>Like Gaussian but corrected for crypto's fatter tails.</td>
+          <td>The most realistic of the three for crypto.</td>
+        </tr>
+      </table>
+      <p>
+        It's normal for the three numbers to differ — that's the whole point
+        of comparing them.
+      </p>
+
+      <h3>Drawdown</h3>
+      <p>
+        How far the portfolio dropped from its all-time peak. <em>Max
+        drawdown</em> is the worst such drop in the period.
+      </p>
+      <p>
+        A max drawdown of <strong>−72%</strong> means there was a moment in the
+        past where the portfolio was worth only 28 cents on the dollar
+        compared to its previous high. Recovery from such drops takes time.
+      </p>
+
+      <h3>Annualized volatility</h3>
+      <p>
+        A number that summarises how bumpy the ride is over a full year.
+        Higher = more swings up and down. A pure-stocks portfolio might be
+        15-20%. Crypto portfolios are often 60-100%.
+      </p>
+
+      <h3>Sharpe ratio</h3>
+      <p>
+        Reward divided by bumpiness. Higher is better.
+      </p>
+      <ul>
+        <li>Below 0 — the portfolio lost money on average.</li>
+        <li>Around 0.5 — typical.</li>
+        <li>Above 1.0 — very good.</li>
+      </ul>
+
+      <h3>Backtesting — does the VaR number actually hold up?</h3>
+      <p>
+        A VaR number is only useful if it is actually right. Backtesting is
+        a fairness check: we go back in time, ask the model to predict the
+        loss for each day using <em>only</em> the data it would have had at
+        the time, and then compare with what really happened.
+      </p>
+      <p>
+        Two things matter:
+      </p>
+      <ul>
+        <li><strong>Breaches</strong> — days where the actual loss was
+          <em>worse</em> than the VaR prediction. At 95% confidence over
+          252 days you'd expect about
+          <strong>252 × 5% ≈ 13 breaches</strong>. Way more = the model
+          underestimates risk. Way fewer = the model is too pessimistic.</li>
+        <li><strong>Clustering</strong> — whether the breaches are spread
+          out evenly or bunched together. A model that gets breaches in
+          clusters has missed the fact that bad days come in waves
+          (volatility regimes).</li>
+      </ul>
+
+      <h3>The three statistical tests</h3>
+      <table>
+        <tr><th>Test</th><th>What it asks</th><th>You want</th></tr>
+        <tr>
+          <td><strong>Kupiec POF</strong></td>
+          <td>Is the <em>total number</em> of breaches close to what we
+            expected?</td>
+          <td>p-value ≥ 0.05 means "yes, looks fine".</td>
+        </tr>
+        <tr>
+          <td><strong>Christoffersen Independence</strong></td>
+          <td>Are the breaches <em>spread out</em>, or are they clustered
+            on consecutive days?</td>
+          <td>p-value ≥ 0.05 means "no clustering — good".</td>
+        </tr>
+        <tr>
+          <td><strong>Conditional Coverage</strong></td>
+          <td>Both at once — a combined verdict.</td>
+          <td>p-value ≥ 0.05 means the model passes overall.</td>
+        </tr>
+      </table>
+      <p>
+        Each test reports a <strong>p-value</strong> between 0 and 1. The
+        rule of thumb: <strong>≥ 0.05 = pass</strong>, <strong>&lt; 0.05 =
+        fail</strong>.
+      </p>
+
+      <h3>The traffic light</h3>
+      <p>
+        Borrowed from the Basel III banking regulation. After the tests, the
+        app combines breach count and breach rate into a single colour:
+      </p>
+      <ul>
+        <li><strong>🟢 Green</strong> — model looks healthy. Use it.</li>
+        <li><strong>🟡 Yellow</strong> — model is borderline. Take it with
+          a pinch of salt.</li>
+        <li><strong>🔴 Red</strong> — model is unreliable for this
+          portfolio / time period. Pick a different method or look at
+          why.</li>
+      </ul>
+      <p>
+        When the test window is close to the Basel III standard
+        (~250 days), the app uses the regulator's exact thresholds. For
+        longer or shorter windows it falls back to a rate-based version
+        that asks "is the number of breaches within roughly ±25% of what
+        we expected?" — the same idea generalised to any window length.
+      </p>
+
+      <h3>Horizon-aware backtesting (what changed in Phase 4)</h3>
+      <p>
+        Before Phase 4 the Backtesting tab always ran a daily one-step
+        test, even if the headline cards showed weekly VaR. That was
+        inconsistent. Now the Horizon input drives <em>both</em> the
+        VaR forecast and the realised return:
+      </p>
+      <ul>
+        <li>At date <em>t</em>, the model looks at the rolling lookback
+          window <em>before</em> <em>t</em>, aggregates it into rolling
+          <em>h</em>-day returns, and computes the <em>h</em>-day VaR
+          from those.</li>
+        <li>The realised value is the realised <em>h</em>-day return
+          starting at <em>t</em> — not the next single day.</li>
+        <li>A breach is exactly the same idea as before, just at the
+          horizon you actually care about:
+          <em>realised h-day return &lt; − h-day VaR</em>.</li>
+      </ul>
+      <p>
+        Side benefit: now you can answer a real question like
+        <em>"my position is held weekly — how often does my 7-day VaR
+        actually understate the loss?"</em>.
+      </p>
+
+      <h3>Monte Carlo — looking forward instead of backward</h3>
+      <p>
+        Backtesting checks the past. Monte Carlo simulates the future.
+        The idea: take the historical mean returns, volatilities, and
+        correlations of your assets, treat them as the description of a
+        joint distribution, then draw <strong>thousands of plausible
+        next-day (or next-7-day, …) outcomes</strong> from that
+        distribution. Apply your portfolio weights to each one, look at
+        the left tail, and report the VaR / CVaR.
+      </p>
+      <table>
+        <tr><th>Distribution</th><th>What it assumes</th><th>When to use it</th></tr>
+        <tr>
+          <td><strong>Normal</strong></td>
+          <td>Returns are bell-shaped. Extreme losses are very rare.</td>
+          <td>As a baseline — usually <em>too optimistic</em> for crypto.</td>
+        </tr>
+        <tr>
+          <td><strong>Student-t</strong></td>
+          <td>Returns are bell-shaped in the middle but have <em>fat
+            tails</em> — extreme losses are far more common than a Normal
+            would predict.</td>
+          <td>The honest choice for crypto. The <strong>df</strong>
+            (degrees of freedom) knob controls how heavy the tails are:
+            df = 4 is very heavy-tailed, df = 30 is almost Normal.
+            Default 5 is a good starting point.</td>
+        </tr>
+      </table>
+      <p>
+        Two important things to remember:
+      </p>
+      <ul>
+        <li><strong>Reproducibility.</strong> Every simulation accepts a
+          random seed. Same seed = identical scenarios. The default seed
+          is 42, so anyone running the demo gets the same numbers you
+          do.</li>
+        <li><strong>Horizon scaling.</strong> For a multi-day horizon
+          <em>h</em>, the Monte Carlo engine multiplies the mean by
+          <em>h</em> and the covariance by <em>h</em> (i.i.d.
+          approximation). That captures the "more days = more
+          dispersion" effect; it does <em>not</em> capture volatility
+          clustering (that's Phase 6, GARCH).</li>
+      </ul>
+
+      <h3>Method comparison — which number to trust</h3>
+      <p>
+        The Monte Carlo tab and the demo both produce a comparison table
+        with five rows. Use it like this:
+      </p>
+      <ul>
+        <li><strong>Historical VaR/CVaR</strong> — what the past
+          actually did. Good baseline.</li>
+        <li><strong>Gaussian VaR/CVaR</strong> — what a Normal model
+          would predict. Usually <em>understates</em> crypto tail
+          risk.</li>
+        <li><strong>Cornish-Fisher VaR</strong> — Gaussian with a fat-
+          tail correction. Often the closest parametric match.
+          (No CVaR — listed as N/A.)</li>
+        <li><strong>Normal MC VaR/CVaR</strong> — same as Gaussian, but
+          drawn from simulation instead of computed from a formula.
+          Useful as a sanity check.</li>
+        <li><strong>Student-t MC VaR/CVaR</strong> — the most
+          conservative number on this list, by design. If your risk
+          tolerance is low, this is the number to act on.</li>
+      </ul>
+
+      <h3>Portfolio value paths</h3>
+      <p>
+        The path chart shows a fan of plausible portfolio trajectories
+        over the next 30 days (configurable). Each translucent line is
+        one simulated future; the solid dark line is the mean across all
+        paths. Reading it:
+      </p>
+      <ul>
+        <li>The <em>spread</em> of the fan tells you how uncertain the
+          next month is.</li>
+        <li>If a meaningful share of paths drops below the dashed
+          initial-value line, that's the visual analogue of CVaR.</li>
+        <li>Switching from Normal to Student-t makes the fan
+          <em>wider</em> — that's the fat-tail effect visualised.</li>
+      </ul>
+
+      <h3>From measuring risk to choosing weights (Phase 5)</h3>
+      <p>
+        Up to this point everything is descriptive: the app tells you
+        what the portfolio's risk <em>is</em>. The Phase-5 Optimization
+        tab is <em>prescriptive</em>: it tells you what the portfolio
+        <em>should</em> be, given the scenarios you trust and the
+        constraints you set.
+      </p>
+
+      <h3>Why CVaR instead of variance (mean-variance) optimisation?</h3>
+      <ul>
+        <li><strong>Variance treats upside and downside the same.</strong>
+          A 20% one-day gain and a 20% one-day loss have identical
+          variance. CVaR only counts the losses.</li>
+        <li><strong>Variance assumes a bell curve.</strong> Crypto
+          returns are fat-tailed — the bell curve underestimates the
+          really bad days. CVaR uses whatever distribution the scenarios
+          come from, fat tails included.</li>
+        <li><strong>CVaR is mathematically <em>coherent</em></strong>
+          (it rewards diversification correctly); VaR alone is not.</li>
+      </ul>
+
+      <h3>The four optimisation objectives, plain English</h3>
+      <table>
+        <tr><th>Objective</th><th>What it solves for</th><th>When to use</th></tr>
+        <tr>
+          <td><strong>Minimum CVaR</strong></td>
+          <td>The safest portfolio — minimises the average loss in the
+            worst β-tail.</td>
+          <td>When capital preservation is the priority.</td>
+        </tr>
+        <tr>
+          <td><strong>Max return under CVaR cap</strong></td>
+          <td>The most aggressive portfolio whose CVaR is still ≤ the
+            cap you set.</td>
+          <td>"I'll take risk, but not more than X% loss in the tail."</td>
+        </tr>
+        <tr>
+          <td><strong>Min CVaR for target return</strong></td>
+          <td>The safest portfolio that still earns at least your
+            target return.</td>
+          <td>"I need at least r% per horizon — minimise everything
+            else."</td>
+        </tr>
+        <tr>
+          <td><strong>CVaR efficient frontier</strong></td>
+          <td>A curve of <em>every</em> efficient trade-off between
+            risk and return.</td>
+          <td>To see the full risk/reward menu before picking a point.</td>
+        </tr>
+      </table>
+
+      <h3>Reading the current-vs-optimised comparison</h3>
+      <p>
+        The comparison table shows your current portfolio on row 1 and
+        each optimised portfolio underneath, all measured on the
+        <em>same</em> scenario matrix. Reading the columns:
+      </p>
+      <ul>
+        <li><strong>Expected return</strong> — average per-horizon
+          return across all scenarios. Bigger is better.</li>
+        <li><strong>Volatility</strong> — standard deviation of
+          scenario returns. Smaller is calmer.</li>
+        <li><strong>VaR / CVaR</strong> — positive loss numbers.
+          Smaller is safer.</li>
+        <li><strong>Money VaR / CVaR</strong> — the same numbers in
+          dollars, given your initial capital.</li>
+        <li><strong>Status</strong> — <em>"optimal"</em> means the
+          solver converged. <em>"infeasible"</em> means the constraints
+          couldn't be satisfied (see the warning callout in section 7).</li>
+      </ul>
+      <p>
+        A typical pattern: the <strong>Min CVaR</strong> portfolio has
+        smaller CVaR <em>and</em> a smaller expected return than your
+        current one (no free lunch). The <strong>Max Return under CVaR
+        Cap</strong> portfolio sits with CVaR ≈ the cap you chose. The
+        <strong>Target Return</strong> portfolio earns close to your
+        target with the lowest CVaR possible.
+      </p>
+
+      <h3>The CVaR efficient frontier chart</h3>
+      <p>
+        Each dot is one optimal portfolio. The x-axis is CVaR (more →
+        riskier); the y-axis is expected return (higher → more
+        profitable). The <span style="color:#27ae60;font-weight:bold;">green
+        dot</span> is the minimum-CVaR portfolio (left-most). The
+        <span style="color:#f39c12;font-weight:bold;">orange dot</span>
+        is the maximum-return portfolio (top-most). Every dot in
+        between is a different valid trade-off — you pick the one that
+        matches your appetite.
+      </p>
+    </section>
+
+    <!-- 9 ─ Troubleshoot -->
+    <section id="troubleshoot">
+      <h2>9. If something goes wrong</h2>
+
+      <h3>"python3: command not found" or "python is not recognized"</h3>
+      <p>
+        Python is not installed, or Windows didn't add it to PATH. Re-run the
+        Python installer and make sure to tick <em>"Add Python to PATH"</em>
+        on the very first screen.
+      </p>
+
+      <h3>The terminal says "(.venv)" disappeared after I closed it</h3>
+      <p>
+        That's normal. Every time you reopen the terminal you must
+        re-activate:
+      </p>
+      <pre><code># Windows
+.\.venv\Scripts\Activate.ps1
+
+# macOS / Linux
+source .venv/bin/activate</code></pre>
+
+      <h3>"streamlit: command not found"</h3>
+      <p>
+        Either the workspace isn't activated (no <code>(.venv)</code> in the
+        prompt) or the install step didn't complete. Re-run:
+      </p>
+      <pre><code>pip install -r requirements.txt</code></pre>
+
+      <h3>"CoinGecko returned HTTP 429"</h3>
+      <p>
+        The free price service is rate-limited. Either wait a minute and try
+        again, or change <em>Data source</em> in the sidebar to
+        <strong>yfinance</strong>.
+      </p>
+
+      <h3>The browser tab didn't open by itself</h3>
+      <p>
+        Open a new tab manually and visit:
+      </p>
+      <pre><code>http://localhost:8501</code></pre>
+
+      <h3>The app shows an error in red after I click Run</h3>
+      <p>
+        The error message itself usually tells you what to fix. The most
+        common ones:
+      </p>
+      <ul>
+        <li><strong>"Weights must sum to 1.0"</strong> — turn on auto-normalize
+          in the sidebar.</li>
+        <li><strong>"Not enough price data"</strong> — pick an earlier start
+          date.</li>
+        <li><strong>"Asset 'X' is missing 'coingecko_id'"</strong> — fix the
+          missing ID in the portfolio editor row, or delete that row.</li>
+      </ul>
+
+      <h3>I want to start completely fresh</h3>
+      <p>
+        Delete the <code>.venv</code> folder and the <code>data/cache/</code>
+        folder, then go through the setup section again from step 2.
+      </p>
+
+      <div class="callout danger">
+        <strong>If none of this helps:</strong> take a screenshot of the error
+        and send it to whoever shared this project with you. Include the last
+        few lines of the terminal output.
+      </div>
+    </section>
+
+    <!-- 10 ─ Glossary -->
+    <section id="glossary">
+      <h2>10. Glossary</h2>
+      <dl>
+        <dt>Terminal (also: Command Prompt, PowerShell, Shell)</dt>
+        <dd>A text window where you type commands instead of clicking
+          buttons.</dd>
+
+        <dt>Python</dt>
+        <dd>A popular programming language. The project is written in it.</dd>
+
+        <dt>pip</dt>
+        <dd>The tool Python uses to download and install other packages.</dd>
+
+        <dt>Virtual environment (venv)</dt>
+        <dd>An isolated workspace for the project so it can use specific
+          versions of packages without affecting anything else on your
+          computer.</dd>
+
+        <dt>Streamlit</dt>
+        <dd>The tool that turns the project's Python code into a web page you
+          interact with in your browser.</dd>
+
+        <dt>CoinGecko / yfinance</dt>
+        <dd>Two free services that provide historical crypto prices. The
+          project tries CoinGecko first and falls back to yfinance if needed.</dd>
+
+        <dt>Portfolio</dt>
+        <dd>The collection of coins (or stocks) you own and the percentage of
+          your money in each.</dd>
+
+        <dt>Weight</dt>
+        <dd>The fraction of your portfolio in one asset. 0.5 = 50%.</dd>
+
+        <dt>Return</dt>
+        <dd>How much an asset went up or down over one period, expressed as a
+          percentage. +2% means it gained two percent that day.</dd>
+
+        <dt>Confidence level</dt>
+        <dd>How rare the event you're measuring is. 95% means "the loss you
+          will not exceed 95 days out of 100".</dd>
+
+        <dt>VaR</dt>
+        <dd>Value at Risk. The loss threshold that should only be crossed on
+          the worst few days.</dd>
+
+        <dt>CVaR (Expected Shortfall)</dt>
+        <dd>The average loss on those worst few days.</dd>
+
+        <dt>Drawdown</dt>
+        <dd>How far the portfolio has fallen from its previous all-time high.</dd>
+
+        <dt>Backtesting</dt>
+        <dd>Replaying history day by day to check whether a risk model
+          would have predicted the right number of bad days.</dd>
+
+        <dt>Breach (or exception)</dt>
+        <dd>A day when the actual loss was worse than the VaR prediction.
+          At 95% confidence, about 5% of days should be breaches.</dd>
+
+        <dt>Rolling window</dt>
+        <dd>The block of recent past days the model uses to make each new
+          prediction. 252 days ≈ one trading year — the regulatory
+          standard.</dd>
+
+        <dt>p-value</dt>
+        <dd>A number between 0 and 1 from a statistical test. In this app
+          the rule is simple: <em>≥ 0.05 = the model passes,
+          &lt; 0.05 = the model fails</em>.</dd>
+
+        <dt>Kupiec POF / Christoffersen tests</dt>
+        <dd>Standard backtesting tests. Kupiec checks the <em>count</em>
+          of breaches; Christoffersen checks whether they are
+          <em>clustered</em>. The Conditional Coverage test combines both.</dd>
+
+        <dt>Traffic light (Basel III)</dt>
+        <dd>The regulator's green / yellow / red verdict on a backtested
+          VaR model, based on how many breaches occurred over a
+          ~250-day window.</dd>
+
+        <dt>Horizon (or time horizon)</dt>
+        <dd>How far into the future the risk forecast looks.
+          <em>h = 1</em> is daily; <em>h = 7</em> is weekly. In the
+          Backtesting and Monte Carlo tabs, this is the
+          <strong>Horizon (days)</strong> input.</dd>
+
+        <dt>Horizon-aware backtesting</dt>
+        <dd>The Phase-4 fix: when the horizon is 7, the backtest
+          compares the realised <em>7-day</em> forward return against
+          the <em>7-day</em> VaR forecast, not yesterday's daily return
+          against a daily VaR.</dd>
+
+        <dt>Monte Carlo</dt>
+        <dd>A technique that estimates risk by simulating thousands of
+          plausible futures from a probability model, then summarising
+          the simulated loss distribution. Opposite of backtesting,
+          which only looks at the past.</dd>
+
+        <dt>Scenario</dt>
+        <dd>One simulated future. The Monte Carlo engine draws 5,000
+          of them by default.</dd>
+
+        <dt>Normal vs Student-t distribution</dt>
+        <dd>Two ways the simulator models returns. Normal = thin tails
+          (extreme losses very rare). Student-t = fat tails (extreme
+          losses much more likely). Crypto markets behave like
+          Student-t.</dd>
+
+        <dt>Degrees of freedom (df)</dt>
+        <dd>The tail-heaviness knob for the Student-t simulator.
+          Smaller df → heavier tails. Must be greater than 2 so the
+          variance is finite. Default 5.</dd>
+
+        <dt>Random seed</dt>
+        <dd>An integer that pins down the random-number generator.
+          Same seed = identical scenarios every run. Default 42.</dd>
+
+        <dt>Portfolio path</dt>
+        <dd>One simulated trajectory of the portfolio's dollar value
+          over the next <em>h</em> days, drawn from the Monte Carlo
+          model.</dd>
+
+        <dt>Portfolio optimisation</dt>
+        <dd>The Phase-5 step that <em>chooses weights</em> — instead of
+          just measuring the risk of your current portfolio, it solves
+          for a new one that minimises tail risk, maximises return
+          under a risk cap, or hits a target return as safely as
+          possible.</dd>
+
+        <dt>Scenario matrix</dt>
+        <dd>The table of returns the optimiser uses as its picture of
+          the future: rows = scenarios (one per simulated day or one
+          per historical day), columns = assets. It can come from
+          history or from Monte Carlo.</dd>
+
+        <dt>Constraint</dt>
+        <dd>A rule the optimiser must obey. Examples: "weights add to
+          100%", "no shorting" (long-only), "no single asset above
+          50%", "CVaR must stay below 10%".</dd>
+
+        <dt>Long-only</dt>
+        <dd>A constraint that forbids negative weights. You can only
+          <em>own</em> assets, not bet against them.</dd>
+
+        <dt>Cash asset</dt>
+        <dd>An optional extra column added to the scenario matrix with
+          a constant per-horizon return (e.g. the daily risk-free
+          rate). The optimiser can put money in cash like any other
+          asset.</dd>
+
+        <dt>Minimum CVaR portfolio</dt>
+        <dd>The portfolio with the smallest possible CVaR given your
+          constraints. The safest weights under the chosen risk
+          measure.</dd>
+
+        <dt>CVaR cap</dt>
+        <dd>A user-set upper bound on portfolio CVaR. The optimiser
+          chases as much expected return as possible <em>without</em>
+          letting CVaR exceed this value.</dd>
+
+        <dt>Target return</dt>
+        <dd>A minimum expected return the optimised portfolio must
+          deliver. The optimiser then picks the lowest-CVaR portfolio
+          that satisfies it.</dd>
+
+        <dt>CVaR efficient frontier</dt>
+        <dd>The curve of all portfolios that give the highest expected
+          return at each level of CVaR (or, equivalently, the lowest
+          CVaR at each target return). You pick the point that matches
+          your risk appetite.</dd>
+
+        <dt>Rockafellar-Uryasev formulation</dt>
+        <dd>A mathematical trick (Rockafellar & Uryasev, 2000) that
+          turns CVaR optimisation into a <em>linear programme</em> —
+          fast, globally optimal, and easy to solve. The Phase-5
+          engine uses this under the hood via CVXPY.</dd>
+
+        <dt>Infeasible (optimisation status)</dt>
+        <dd>The solver couldn't find any weights that satisfy your
+          constraints all at once (e.g. the target return is so high
+          that no combination of assets can reach it). The app reports
+          the status and keeps running.</dd>
+
+        <dt>Solver (CVXPY / CLARABEL / SCS / ECOS)</dt>
+        <dd>The numerical engine that actually crunches the linear
+          programme. The project uses CVXPY as the modelling layer and
+          falls back through CLARABEL → SCS automatically — no
+          commercial solvers required.</dd>
+
+        <dt>localhost</dt>
+        <dd>Your own computer, when seen as a website. The web app lives at
+          <code>http://localhost:8501</code> while it is running.</dd>
+      </dl>
+
+      <hr>
+      <p style="color: var(--muted); font-size: 14px;">
+        That's everything you need. If you got the app open and you can read
+        the risk summary table, you've made it. The rest is just exploring
+        different coins, dates, and confidence levels.
+      </p>
+    </section>
+
+    <!-- 11 ─ Project changelog (markdown source) -->
+    <section id="changelog">
+      <h2>11. Project changelog</h2>
+      <p class="lede">
+        A complete, machine-readable record of every change shipped to this
+        project, written in <strong>markdown</strong>. You can copy this
+        block as-is into a <code>CHANGELOG.md</code> file at the repo root.
+        It mirrors what is recorded across <code>README.md</code> and the
+        <code>openspec/</code> directory.
+      </p>
+      <pre><code># Project changelog — Flexible VaR / CVaR Crypto Portfolio Risk Engine
+
+> Compiled from `README.md`, `openspec/specs/*.md`, and
+> `openspec/changes/*/{proposal,tasks,design}.md`.
+> Current package version: **0.5.0**.
+
+---
+
+## Phase 1 — Core Risk Engine ✅
+
+Foundational analytics: load prices, clean them, compute returns,
+aggregate into a portfolio, and produce VaR / CVaR / drawdown.
+
+### Modules
+
+- `config.py` — load `configs/config.yaml` + `configs/assets.yaml` into one
+  merged dict.
+- `coingecko_client.py` — primary data source. Cache-on-disk, retry with
+  backoff, optional `COINGECKO_API_KEY` header.
+- `yfinance_client.py` — fallback data source for the full history range.
+- `data_loader.py` — orchestrator. CoinGecko → yfinance fallback → CSV.
+  Validation (DatetimeIndex, no duplicates, monotonic, strictly positive
+  prices).
+- `preprocessing.py` — `clean_price_data()` (forward-fill, drop-all-NaN
+  columns, alignment).
+- `returns.py` — `calculate_simple_returns`, `calculate_log_returns`,
+  unified `calculate_returns(method=...)`.
+- `portfolio.py` — `get_weights_from_config`, `normalize_weights`,
+  `validate_weights`, `calculate_portfolio_returns`,
+  `calculate_portfolio_value`.
+- `var_models.py` — abstract `VaRModel` base + `HistoricalVaR`,
+  `GaussianVaR`, `CornishFisherVaR`. Front-door `calculate_var(method,
+  confidence_level)`.
+- `cvar_models.py` — `HistoricalCVaR`, `GaussianCVaR` (analytic
+  `−(μ − σ · φ(z) / α)`).
+- `risk_metrics.py` — `calculate_max_drawdown`, `generate_risk_summary`.
+- `plotting.py` — `plot_return_distribution_with_var_cvar`,
+  `plot_cumulative_returns`, `plot_drawdown`. `matplotlib` only,
+  `Agg` backend safe.
+- `export.py` — `ensure_output_dirs`, `save_dataframe`, `save_series`,
+  `save_json`. Always creates parent directories.
+
+### Outputs
+
+- `outputs/tables/price_data.csv`, `asset_returns.csv`,
+  `portfolio_returns.csv`, `portfolio_value.csv`, `risk_summary.csv`
+- `outputs/charts/return_distribution_var_cvar.png`,
+  `cumulative_returns.png`, `drawdown.png`
+
+### Tests
+
+42 unit tests across `test_var_models.py`, `test_cvar_models.py`,
+`test_returns.py`, `test_portfolio.py`, `test_risk_metrics.py`,
+`test_data_loader.py`. Synthetic Student-t (df=4) fixture for
+fat-tail behaviour.
+
+---
+
+## Phase 2 — Streamlit Interactive Dashboard ✅
+
+Browser-based UI wrapping the Phase 1 analytics.
+
+### What was built
+
+- `app.py` — Streamlit single-page application.
+- Sidebar controls: data source + fallback toggle, date range,
+  return method, initial capital, normalise / short-sell flags,
+  confidence slider, horizon, VaR / CVaR method multi-select.
+- Live `st.data_editor` for asset symbols + vendor IDs + weights.
+- "▶️ Run risk analysis" button gates the analysis pipeline.
+- Headline VaR / CVaR cards row (dynamic per selected methods).
+- Five result tabs: Risk summary, Distribution, Cumulative, Drawdown,
+  Data.
+- One-click CSV / PNG downloads on every chart and table.
+- Caching: `@st.cache_data` on `_fetch_prices` to avoid refetching on
+  every rerun.
+
+---
+
+## Phase 3 — VaR Backtesting & Model Validation ✅
+
+Convert the engine from a one-shot calculator into a model
+*validation* engine aligned with the Basel III market risk framework
+(BCBS 2019).
+
+### New module — `backtesting.py` (~570 lines, pure functions, no I/O)
+
+- `rolling_var_forecast(returns, method, confidence_level, window)` —
+  strict no-look-ahead one-step-ahead forecast. Slice
+  `returns[t-window:t]` excludes `t`. Output length = `len(returns) - window`.
+- `calculate_var_breaches(forecast_df, confidence_level)` — counts,
+  rates, ratio.
+- `kupiec_pof_test(breaches, confidence_level)` — Proportion of Failures
+  likelihood ratio, χ² df = 1. Robust at `x = 0` and `x = n` via the
+  `0 · log(0) = 0` convention (helper `_xlogx`).
+- `christoffersen_independence_test(breaches)` — first-order Markov
+  transition matrix, LR χ² df = 1.
+- `christoffersen_cc_test(breaches, confidence_level)` — joint test,
+  `LR_cc = LR_pof + LR_ind`, χ² df = 2.
+- `assign_traffic_light_status(...)` — modes: `basel3`, `rate_based`,
+  `auto` (basel3 when 240 ≤ n ≤ 260).
+- `interpret_traffic_light_status(status)` — canonical sentence per
+  Green / Yellow / Red.
+- `backtest_var_model(...)` — orchestrator returning
+  `(forecast_df, result_dict)` with 19+ documented keys including
+  `traffic_light_mode_used`.
+- `compare_var_models_backtest(...)` — multi-method runner. A failure
+  in one method records the error in the row and continues; never
+  aborts the comparison.
+- `create_backtesting_report_table(comparison_df)` — 14-column
+  reporting table with ✓ Pass / ✗ Fail / N/A formatting.
+
+### New plots (appended to `plotting.py`)
+
+- `plot_var_backtest` — grey actual line, red dashed −VaR line, red
+  ✕ scatter on breaches.
+- `plot_breach_timeline` — `ax.vlines` per breach; clean strip view
+  (no y-axis ticks or label) for visual cluster detection.
+- `plot_model_comparison_backtest` — grouped bars (actual vs expected),
+  edge colour tied to traffic light.
+
+### Streamlit Backtesting tab
+
+- 6th tab: **🔬 Backtesting & Model Validation**.
+- Method picker (Historical / Gaussian / Cornish-Fisher / Compare All),
+  confidence selectbox, rolling-window selectbox, test-period
+  expander (Full / 1 yr / 2 yr / Custom).
+- "▶️ Run Backtest" button with `st.session_state["backtest_results"]`
+  persistence — results survive reruns from chart-sub-tab clicks and
+  download buttons.
+- Single-method view: 2×4 KPI grid (Observations, Breaches, Expected,
+  Rate, Kupiec p, Christ. p, CC p, traffic-light badge), chart tabs,
+  forecast-data expander, Forecast CSV + Results JSON downloads.
+- Compare-all view: styled report table (traffic-light cell
+  colouring), comparison chart, per-method detail expanders.
+
+### Tests — `test_backtesting.py`
+
+50 pytest tests with seeded RNGs:
+
+- Output schema (`rolling_var_forecast` columns, length).
+- **No-look-ahead invariant** — for every forecast date the value is
+  reproduced from `series.iloc[pos-window:pos]` alone. Catches any
+  future refactor that introduces look-ahead bias deterministically.
+- Breach detection (`actual < -var`).
+- Boundary cases for Kupiec (`x = 0`, `x = n`).
+- All-same and length-1 inputs for Christoffersen Independence.
+- CC test uses χ² df = 2 (verified against scipy).
+- Traffic light: basel3 thresholds, rate-based bands, auto-selection
+  at n ∈ [240, 260].
+- `compare_var_models_backtest` swallows per-method errors.
+- Reporting helpers (`_format_pass`, `_format_float`) edge cases.
+
+### Outputs
+
+- `outputs/tables/var_forecasts_&lt;method&gt;.csv` (one per VaR method).
+- `outputs/tables/model_comparison.csv`.
+- `outputs/tables/backtesting_results_&lt;method&gt;.json`.
+- `outputs/charts/var_backtesting_exceptions_&lt;method&gt;.png`.
+- `outputs/charts/breach_timeline_&lt;method&gt;.png`.
+- `outputs/charts/model_comparison_backtest.png`.
+
+---
+
+## Phase 3 Stabilization Pass
+
+Post-implementation cleanup. No new analytics; only hygiene + DX.
+
+### Lightweight package surface
+
+`src/var_cvar_crypto_risk/__init__.py` now exposes only:
+
+```python
+__version__ = "0.3.0"
+__project__ = "Flexible VaR/CVaR Crypto Portfolio Risk Engine"
+```
+
+No more eager imports of `data_loader`, `coingecko_client`, or
+`yfinance_client`. Users import explicitly:
+
+```python
+from var_cvar_crypto_risk.var_models import calculate_var
+from var_cvar_crypto_risk.backtesting import backtest_var_model
+```
+
+### Lazy optional dependencies
+
+- `yfinance_client.fetch_yfinance_prices` imports `yfinance` *inside*
+  the call, raising a clear `ImportError("yfinance is required for the
+  yfinance data source. Install it with: pip install yfinance")` if
+  missing.
+- `data_loader.load_price_data` lazy-imports `coingecko_client` and
+  the yfinance fallback only at the code path that needs them.
+
+Consequence: `import var_cvar_crypto_risk.backtesting` never touches
+`yfinance`. Verified by a subprocess test in
+`tests/test_stabilization.py`.
+
+### Single unified entry point
+
+- **Added** `run_demo.py` — one command runs Phase 1 (prices →
+  returns → VaR / CVaR / drawdown + charts) followed by Phase 3
+  (rolling backtest → coverage tests → traffic light + comparison).
+- **Removed** the three per-phase scripts
+  (`run_phase1_demo.py`, `run_phase3_demo.py`,
+  `run_phase3_backtest_demo.py`).
+
+### Streamlit state-management fix
+
+Bug: clicking "Run Backtest" caused a rerun where the original "Run
+risk analysis" button was no longer `True`, so the app reached
+`st.stop()` and the Backtesting tab never executed.
+
+Fix: persist results in `st.session_state["risk_results"]` after the
+first successful analysis, and `st.session_state["backtest_results"]`
+after the first successful backtest. All downstream charts /
+downloads / tab content run off the cached state, which survives
+arbitrary Streamlit reruns.
+
+### Repository hygiene
+
+- `.gitignore` covers `__pycache__/`, `.pytest_cache/`, `.venv/`,
+  `*.egg-info/`, `.DS_Store`, `__MACOSX/`, `outputs/`, `data/cache/`,
+  build / dist / Jupyter checkpoint dirs.
+- `.gitkeep` markers preserve `data/{raw,processed,cache}/` and
+  `outputs/{charts,tables,reports}/` empty-folder structure.
+
+### Stabilization tests
+
+`tests/test_stabilization.py` (5 tests):
+
+1. `test_package_import_is_lightweight` — `import
+   var_cvar_crypto_risk` does not load `yfinance`,
+   `coingecko_client`, or `data_loader`.
+2. `test_backtesting_import_without_yfinance` — `import
+   var_cvar_crypto_risk.backtesting` does not load `yfinance`.
+3. `test_demo_script_imports` — `run_demo.py` imports cleanly.
+4. `test_export_creates_parent_dirs` — `save_dataframe`,
+   `save_series`, `save_json`, `ensure_output_dirs` all create
+   missing parent directories.
+5. `test_backtesting_works_without_yfinance` — backtests run even
+   when `sys.modules["yfinance"]` is stubbed.
+
+### Two minor backtesting fixes
+
+- `plotting.plot_breach_timeline` — added `ax.set_ylabel("")` after
+  `ax.set_yticks([])` so the Y-axis is completely invisible (spec
+  compliance).
+- `backtesting.compare_var_models_backtest` — added
+  `"traffic_light_mode_used": result["traffic_light_mode_used"]` to
+  the success-path row dict so this information survives multi-model
+  comparisons.
+
+---
+
+## Phase 4 — Monte Carlo Scenario Engine + horizon-aware backtesting ✅
+
+Add forward-looking risk estimation by simulating thousands of plausible
+multi-asset return scenarios under parametric distributions, and fix the
+Phase 3 inconsistency where backtesting always ran daily even when the
+headline cards showed a multi-day VaR.
+
+### Fix: horizon-aware backtesting
+
+- `calculate_realized_horizon_returns(returns, horizon_days, method)` —
+  forward h-day compounded (`simple`) or summed (`log`) return at each
+  index. Last `h` observations dropped (no full forward window).
+- `rolling_var_forecast(..., horizon_days, return_method)` — for
+  `h > 1` the lookback window is aggregated into rolling h-day returns
+  *first*, then VaR is estimated from those. Realised value is the
+  realised h-day forward return starting at `t`. Horizon=1 behaviour
+  is preserved bit-for-bit. No look-ahead bias (test enforced).
+- `horizon_days` is now a column on every forecast DataFrame and a key
+  in every result dict, and propagates through
+  `backtest_var_model`, `compare_var_models_backtest`, and the report
+  table (new "Horizon (days)" column).
+- Streamlit Backtesting tab exposes a `Horizon (days)` number input
+  and labels every chart/table with the chosen horizon.
+
+### New module — `monte_carlo.py` (~520 lines, pure analytics)
+
+- `estimate_return_parameters(returns, annualize, periods_per_year)`
+  — mean vector, covariance, correlation, volatility; default
+  `periods_per_year = 365` for crypto.
+- `simulate_normal_returns(mean, cov, n_scenarios, horizon_days,
+  random_seed)` — multivariate Normal via Cholesky. Linear horizon
+  scaling.
+- `simulate_student_t_returns(..., df)` — multivariate Student-t with
+  fat tails. Covariance rescaled by `(df-2)/df` so simulated samples
+  match the historical covariance. Requires `df > 2`.
+- `calculate_portfolio_scenario_returns(scenarios, weights)` —
+  weighted aggregation into a portfolio scenario `pd.Series`.
+- `scenario_var`, `scenario_cvar` — empirical left-tail percentile /
+  tail mean as positive losses. `CVaR ≥ VaR` always holds.
+- `monte_carlo_risk_summary(scenarios, confidence_level,
+  initial_capital, label)` — single-distribution Metric / Value / Unit
+  table with optional money VaR / CVaR.
+- `simulate_portfolio_paths(daily_mean, daily_vol, initial_value,
+  n_paths, horizon_days, distribution, df, random_seed)` — Normal or
+  Student-t portfolio value paths. First row = `initial_value` for every
+  path.
+- `compare_monte_carlo_distributions(...)` — Normal & Student-t in one
+  call; returns scenarios dict + comparison DataFrame.
+- `compare_all_risk_methods(portfolio_returns, asset_returns, weights,
+  confidence_level, horizon_days, n_scenarios, student_t_df,
+  random_seed)` — Historical / Gaussian / Cornish-Fisher / Normal MC
+  / Student-t MC in one DataFrame with `Horizon Days` + `Notes`. For
+  `horizon_days > 1`, parametric methods aggregate to rolling h-day
+  returns rather than sqrt-time scaling. Cornish-Fisher CVaR is left
+  as `NaN`.
+
+### New plots (appended to `plotting.py`)
+
+- `plot_mc_loss_distribution` — histogram of simulated returns with
+  VaR and CVaR threshold lines and a highlighted tail bin.
+- `plot_mc_portfolio_paths` — translucent fan of paths plus a solid
+  mean-path overlay; sub-samples to at most 100 paths for readability.
+- `plot_normal_vs_student_t_distribution` — overlay histograms on a
+  shared bin grid to make the fat-tail difference visible.
+- `plot_var_cvar_method_comparison` — grouped VaR/CVaR bars by method
+  with N/A handling for Cornish-Fisher CVaR.
+
+### Streamlit Monte Carlo tab
+
+- 7th tab: **🎲 Monte Carlo Scenario Engine**.
+- Widgets: distribution (Normal / Student-t / Compare), n_scenarios
+  (1k–100k), horizon (1–60 days), confidence (90/95/97.5/99 %),
+  Student-t df (3–30), random seed, n_paths (10–10 000),
+  path-horizon (1–365 days).
+- KPI cards: MC VaR, MC CVaR (with dollar equivalents), mean simulated
+  return, worst simulated return, number of scenarios.
+- Charts: scenario distribution with VaR/CVaR markers, portfolio
+  value paths fan chart, Normal-vs-Student-t overlay (in Compare
+  mode), method-comparison bar chart.
+- Comparison DataFrame (Historical / Gaussian / CF / Normal MC /
+  Student-t MC) formatted with percentages and download buttons.
+- Session-state persistence (`mc_results`) — survives reruns from
+  other tabs.
+
+### Tests — `test_monte_carlo.py` (18 tests)
+
+- `estimate_return_parameters` keys, shapes, and annualisation.
+- Normal scenario shape, reproducibility for fixed seed, larger
+  dispersion at h=10 vs h=1.
+- Student-t shape and `df ≤ 2` raises `ValueError`.
+- Portfolio scenario weighted-sum correctness.
+- `scenario_var > 0`, `scenario_cvar ≥ scenario_var`.
+- `monte_carlo_risk_summary` shape and required Metric rows.
+- `simulate_portfolio_paths` first-row equality and `(h+1) × n_paths`
+  shape for both Normal and Student-t.
+- `compare_monte_carlo_distributions` returns dict + DataFrame with
+  both distributions; `CVaR ≥ VaR`.
+- `compare_all_risk_methods` includes all five methods and carries
+  the horizon through.
+- Import isolation: `monte_carlo` must not import `streamlit`;
+  `backtesting` must not import `yfinance`.
+
+### Phase 4 outputs
+
+CSVs under `outputs/tables/`:
+
+- `mc_scenarios_normal.csv`, `mc_scenarios_student_t.csv`
+- `mc_portfolio_returns_normal.csv`,
+  `mc_portfolio_returns_student_t.csv`
+- `mc_risk_summary.csv`
+- `model_risk_comparison.csv`
+
+PNGs under `outputs/charts/`:
+
+- `mc_loss_distribution_normal.png`,
+  `mc_loss_distribution_student_t.png`
+- `mc_portfolio_paths.png`
+- `normal_vs_student_t_mc.png`
+- `var_cvar_method_comparison.png`
+
+### Configuration
+
+`configs/config.yaml` adds a `monte_carlo:` block (default_distribution
+= `student_t`, n_scenarios = 5000, horizon_days = 1, random_seed = 42,
+student_t_df = 5, n_paths = 500, path_horizon_days = 30) and grows the
+existing `backtesting:` block with `default_horizon_days` and
+`horizon_aware: true`. The project version bumps to `0.4.0`.
+
+### Reproducibility
+
+Every Monte Carlo simulator accepts a `random_seed` (default 42); with
+the same seed, samples are identical (enforced by
+`test_simulate_normal_returns_reproducible`). The defensive Cholesky
+helper retries with growing diagonal jitter so near-singular covariance
+matrices don't crash the engine.
+
+### Unified entry point
+
+Phase 4 is Step 3 of `run_demo.py`. There is still only one demo
+script:
+
+```bash
+python run_demo.py
+```
+
+It runs Phase 1 (core risk) → Phase 3 (horizon-aware backtest) →
+Phase 4 (Monte Carlo + cross-method comparison + paths) and writes
+every CSV/PNG above.
+
+---
+
+## Phase 5 — CVaR Portfolio Optimisation ✅
+
+Turns the project from a pure measurement / simulation platform into
+a **portfolio decision-making tool**. Given a scenario return matrix
+(historical or Monte Carlo), the new optimisation layer solves for
+weights that minimise tail risk, maximise return under a tail-risk
+cap, or trace out the CVaR efficient frontier. Built on top of the
+Phase-4 scenario engine — no breaking changes to Phase 1–4 APIs.
+
+### Why CVaR rather than mean-variance
+
+- Variance is symmetric (it punishes upside as much as downside);
+  CVaR only counts losses.
+- Mean-variance assumes Gaussian returns; CVaR optimisation inherits
+  whatever distribution the scenarios came from, fat tails included.
+- Rockafellar & Uryasev (2000) recast scenario CVaR as a **linear
+  programme** — globally optimal, no curvature pathologies, blazing
+  fast.
+
+### New module
+
+`src/var_cvar_crypto_risk/optimization.py` — pure analytics (no
+plotting, no Streamlit, no I/O). Lazy-imports CVXPY so callers that
+only need the validation / builder helpers don't pay the import cost.
+
+Public surface:
+
+- `validate_scenario_matrix(scenario_returns)` — strict input check.
+- `add_cash_asset(scenario_returns, cash_return, cash_name)` —
+  non-mutating; raises on duplicate column.
+- `estimate_expected_returns(scenario_returns, method)` —
+  `"mean"` / `"median"` / `"zero"`.
+- `calculate_portfolio_scenario_metrics(scenario_returns, weights,
+  confidence_level, initial_capital)` — uniform metric dict
+  (expected return / vol / VaR / CVaR / worst / best, optional money
+  values).
+- `format_weights_table(weights)` — descending Asset / Weight table.
+- `build_optimization_scenarios(asset_returns, source, n_scenarios,
+  horizon_days, student_t_df, random_seed)` — single adapter for the
+  three sources (`"historical"` with rolling h-day aggregation,
+  `"normal_mc"`, `"student_t_mc"`).
+- **Optimisers** (all return a uniform `{status, objective_value,
+  weights, expected_return, VaR, CVaR, volatility, solver, message,
+  …}` dict and never crash on infeasibility):
+  - `minimize_cvar(...)` — Rockafellar-Uryasev LP for the safest
+    portfolio.
+  - `maximize_return_with_cvar_constraint(..., cvar_limit, ...)` —
+    chase return while keeping CVaR ≤ cap.
+  - `minimize_cvar_for_target_return(..., target_return, ...)` —
+    safest portfolio that still earns ≥ target.
+  - `generate_cvar_efficient_frontier(..., n_points, ...)` — sweep
+    target returns between the unconstrained min-CVaR and the
+    unconstrained max-return endpoint; skips infeasible points and
+    records the count in `frontier.attrs["n_infeasible"]`.
+- `compare_current_vs_optimized(scenario_returns, current_weights,
+  optimized_results, confidence_level, initial_capital)` — tabulates
+  current vs each optimised portfolio on the same scenario matrix.
+
+### LP formulation (used inside every optimiser)
+
+```
+minimize_{w, t, u}   t + (1 / ((1 − β) · N)) · Σ_i u_i
+subject to           u_i ≥ −R_i w − t      ∀ i
+                     u_i ≥ 0                ∀ i
+                     Σ_j w_j = 1
+                     w_j ∈ [w_min, w_max]   (w_j ≥ 0 for long-only)
+```
+
+At optimum, `t` is the implicit VaR and the objective is the CVaR.
+
+### Plotting additions
+
+`plotting.py` gains four new helpers:
+
+- `plot_optimized_weights` — bar chart of optimal weights (negative
+  weights flagged in red).
+- `plot_portfolio_comparison` — grouped bars across Expected Return /
+  Volatility / VaR / CVaR.
+- `plot_cvar_efficient_frontier` — scatter of expected return vs
+  CVaR with the min-CVaR (green) and max-return (orange) points
+  highlighted.
+- `plot_allocation_comparison` — grouped bars showing each
+  portfolio's asset allocation side by side.
+
+### Streamlit tab
+
+A new **🎯 Portfolio Optimization** tab joins the existing six,
+sharing the same sidebar inputs. Inside the tab:
+
+- Scenario source widgets (Historical / Normal MC / Student-t MC,
+  n_scenarios, horizon, df, seed).
+- Objective selector (Minimize CVaR / Max return under CVaR cap /
+  Min CVaR for target return / Efficient frontier / Compare all).
+- Constraint widgets (long-only, min / max weight per asset, include
+  cash, cash return, CVaR cap, target return, frontier points).
+- KPI cards (Status, Expected return, Volatility, VaR, CVaR).
+- Optimised-weights tables and chart, current-vs-optimised
+  comparison table and chart, allocation-comparison chart, and the
+  efficient-frontier scatter + table.
+- CSV / PNG download buttons under every section.
+- Session-state persistence so results survive sidebar reruns.
+
+### Phase 5 outputs
+
+CSVs under `outputs/tables/`:
+
+- `optimized_weights_min_cvar.csv`
+- `optimized_weights_target_return.csv`
+- `optimized_weights_cvar_cap.csv`
+- `optimization_summary.csv`
+- `portfolio_comparison.csv`
+- `cvar_efficient_frontier.csv`
+
+PNGs under `outputs/charts/`:
+
+- `optimized_weights_min_cvar.png`
+- `current_vs_optimized_risk.png`
+- `cvar_efficient_frontier.png`
+- `portfolio_allocation_comparison.png`
+
+### Configuration
+
+`configs/config.yaml` gains an `optimization:` section with
+`enabled`, `default_scenario_source`, `default_objective`,
+`confidence_level`, `horizon_days`, `long_only`,
+`allow_short_selling`, `min_weight`, `max_weight`, `include_cash`,
+`cash_return`, `cvar_limit`, `target_return`, `n_frontier_points`,
+`expected_returns_method`, `n_scenarios`, `student_t_df`,
+`random_seed`, `solver`. Project version bumps to **0.5.0**.
+
+### Solver strategy
+
+CVXPY is the modelling layer. Solver preference order
+`ECOS → CLARABEL → SCS`, with automatic fallback if a solver is not
+installed or fails on a given LP. No commercial solvers are
+required.
+
+### Reproducibility
+
+All Monte-Carlo paths take a `random_seed` and forward it to Phase 4.
+The LPs are convex and deterministic given the scenario matrix and
+constraints, so identical inputs → identical optimal weights.
+
+### CLI demo
+
+A second entry point joins `run_demo.py`:
+
+```bash
+python run_phase5_optimization_demo.py
+```
+
+The script is thin orchestration only: it loads prices, builds a
+scenario matrix via `build_optimization_scenarios`, runs all three
+optimisers + the frontier, and writes the 6 CSVs and 4 PNGs above
+plus a clean console summary. Heavy lifting lives in
+`optimization.py`.
+
+### Tests
+
+`tests/test_optimization.py` adds 22 tests covering:
+
+- Validation (valid / invalid / non-DataFrame inputs).
+- Cash asset (column added, duplicate raises).
+- Expected returns (mean / zero / bad-method).
+- Portfolio metrics (CVaR ≥ VaR, money values).
+- `minimize_cvar` basic + max-weight + cash variants.
+- `maximize_return_with_cvar_constraint` honours the CVaR cap.
+- `minimize_cvar_for_target_return` honours the target return.
+- Infeasible target-return path doesn't crash.
+- Efficient frontier returns the expected columns + weight columns.
+- Current-vs-optimised comparison includes the current portfolio.
+- Scenario builder for all three sources + bad-source guard.
+- `format_weights_table` sorted descending.
+- Import-isolation guard (`optimization` must not import Streamlit).
+
+All 147 tests now pass with `pytest`.
+
+---
+
+## Documentation deliverables
+
+- `README.md` — Methods, data sources, project structure, installation,
+  running the demo, Streamlit usage, methodology, limitations,
+  **Phase 3 section** (Why backtesting matters / methodology /
+  statistical tests / traffic-light tables / outputs / resume bullet),
+  **Phase 3 Stabilization Update**, **Phase 4 section** (Why Monte
+  Carlo / Normal & Student-t / scenario VaR-CVaR / portfolio paths /
+  horizon-aware backtesting fix / how to run / outputs / limitations
+  / future roadmap / resume bullets), roadmap.
+- `openspec/specs/core-risk-engine.md` — Phase 1 spec.
+- `openspec/specs/streamlit-dashboard.md` — Phase 2 spec.
+- `openspec/specs/backtesting.md` — full Phase 3 spec.
+- `openspec/specs/monte-carlo-engine.md` — full Phase 4 spec (purpose,
+  implemented scope, non-functional requirements, inputs / outputs,
+  edge cases, acceptance criteria, future extension points).
+- `openspec/specs/cvar-optimization.md` — full Phase 5 spec (purpose,
+  math, functional / non-functional requirements, edge cases,
+  acceptance, future extensions).
+- `openspec/specs/advanced-risk-layer.md` — placeholder for Phase 6.
+- `openspec/changes/phase-1-core-risk-engine/{proposal,tasks,design}.md`.
+- `openspec/changes/phase-3-backtesting/{proposal,tasks,design}.md`
+  — including a post-implementation "Stabilization Pass" subsection
+  in `design.md`.
+- `openspec/changes/phase-4-monte-carlo/{proposal,tasks,design}.md`
+  — Why MC / Why Student-t / what was built / data flow / horizon
+  treatment / random seed & reproducibility / connection to Phase 5.
+- `openspec/changes/phase-5-cvar-optimization/{proposal,tasks,design}.md`
+  — Why CVaR / why scenario-based / Rockafellar-Uryasev LP /
+  scenario sources / constraints / infeasibility handling / solver
+  strategy / connection to Phase 6 (risk contribution, stress
+  testing, GARCH).
+- `User-Guide.html` — beginner-friendly walkthrough with the
+  Phase 4 Monte Carlo tab how-to, the Phase 5 Portfolio Optimization
+  tab how-to, current-vs-optimised interpretation, efficient
+  frontier explainer, and glossary additions (Portfolio
+  optimisation, Scenario matrix, Constraint, Long-only, Cash asset,
+  Minimum CVaR portfolio, CVaR cap, Target return, CVaR efficient
+  frontier, Rockafellar-Uryasev, Infeasible, Solver).
+
+---
+
+## Test count over time
+
+| Phase                         | New tests | Cumulative |
+|-------------------------------|----------:|-----------:|
+| 1 — Core risk engine          |        42 |         42 |
+| 3 — Backtesting               |        50 |         92 |
+| 3 stabilization               |         5 |         97 |
+| 4 — Monte Carlo + horizon     |        28 |        125 |
+| 5 — CVaR optimisation         |        22 |        147 |
+
+All 147 tests pass with `pytest` and require no network access or
+optional dependencies. (22 new in Phase 5 = 16 specified core tests
++ 6 extra cases covering import isolation, non-DataFrame guards,
+bad-method guards, bad-source guards, max-weight constraints, and
+the cash-asset path.)
+
+---
+
+## How to run
+
+```bash
+source .venv/bin/activate
+pip install -e . && pip install -r requirements.txt
+python run_demo.py                          # Phase 1 + Phase 3 + Phase 4 → outputs/
+python run_phase5_optimization_demo.py      # Phase 5 CVaR optimisation → outputs/
+streamlit run app.py                        # dashboard (incl. Monte Carlo & Optimisation tabs)
+pytest                                      # 147-test regression suite
+```
+
+---
+
+## Roadmap
+
+- ✅ Phase 1 — Core Risk Engine
+- ✅ Phase 2 — Streamlit Interactive Dashboard
+- ✅ Phase 3 — Backtesting & Model Validation
+- ✅ Phase 4 — Monte Carlo Scenario Engine + horizon-aware backtesting
+- ✅ Phase 5 — CVaR Portfolio Optimisation (Rockafellar-Uryasev)
+- 🔜 Phase 6 — Advanced Risk Layer (GARCH, Copula, Risk Contribution, Stress Testing)
+</code></pre>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>

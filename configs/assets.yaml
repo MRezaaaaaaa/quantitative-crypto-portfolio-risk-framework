@@ -1,0 +1,15 @@
+assets:
+  BTC:
+    coingecko_id: "bitcoin"
+    yfinance_ticker: "BTC-USD"
+    weight: 0.50
+
+  ETH:
+    coingecko_id: "ethereum"
+    yfinance_ticker: "ETH-USD"
+    weight: 0.30
+
+  SOL:
+    coingecko_id: "solana"
+    yfinance_ticker: "SOL-USD"
+    weight: 0.20

@@ -1,0 +1,114 @@
+project:
+  name: "Flexible VaR/CVaR Crypto Portfolio Risk Engine"
+  version: "0.5.0"
+
+data:
+  source: "coingecko"           # "coingecko" | "yfinance" | "csv"
+  fallback_source: "yfinance"
+  quote_currency: "usd"
+  start_date: "2021-01-01"
+  end_date: null                # null = today
+  frequency: "daily"
+  cache_enabled: true
+  cache_dir: "data/cache"
+
+returns:
+  method: "simple"              # "simple" | "log"
+  drop_na: true
+
+portfolio:
+  initial_capital: 100000
+  weighting_method: "manual"    # "manual" | future: "equal" | "optimized"
+  allow_short_selling: false
+  normalize_weights: true
+
+risk:
+  confidence_level: 0.95
+  time_horizon_days: 1
+  var_methods:
+    - historical
+    - gaussian
+    - cornish_fisher
+  cvar_methods:
+    - historical
+    - gaussian
+
+outputs:
+  save_tables: true
+  save_charts: true
+  output_dir: "outputs"
+
+backtesting:
+  enabled: true
+  default_window: 252
+  default_confidence_level: 0.95
+  default_horizon_days: 1
+  horizon_aware: true
+  default_mode: "overlapping"        # "overlapping" | "non_overlapping"
+  modes:
+    - overlapping
+    - non_overlapping
+  rolling_breach_window: 100
+  methods:
+    - historical
+    - gaussian
+    - cornish_fisher
+  significance_level: 0.05
+  traffic_light_mode: "auto"   # "basel3" | "rate_based" | "auto"
+
+monte_carlo:
+  enabled: true
+  default_distribution: "student_t"  # "normal" | "student_t"
+  n_scenarios: 5000
+  horizon_days: 1
+  random_seed: 42
+  student_t_df: 5
+  n_paths: 500
+  path_horizon_days: 30
+
+optimization:
+  enabled: true
+  default_scenario_source: "historical"   # "historical" | "normal_mc" | "student_t_mc"
+  default_objective: "minimize_cvar"      # minimize_cvar | max_return_cvar_cap |
+                                          # min_cvar_target_return | efficient_frontier
+  confidence_level: 0.95
+  horizon_days: 1
+  long_only: true
+  allow_short_selling: false
+  min_weight: 0.0
+  max_weight: 1.0
+  include_cash: false
+  cash_return: 0.0
+  cvar_limit: 0.10
+  target_return: 0.001            # expected return per horizon (e.g. 0.10% daily)
+  n_frontier_points: 20
+  expected_returns_method: "mean"         # "mean" | "median" | "zero" | "shrinkage_to_zero"
+  expected_return_estimators:
+    - mean
+    - median
+    - zero
+    - shrinkage_to_zero
+  shrinkage_weight: 0.5                    # weight on historical mean for shrinkage_to_zero
+  enable_max_sharpe: true
+  enable_manual_views: true
+  n_scenarios: 5000                       # only used for normal_mc / student_t_mc
+  student_t_df: 5
+  random_seed: 42
+  solver: null                            # null = auto (prefers CLARABEL/SCS)
+
+distribution:
+  horizon_matched: true
+  show_methodology_panel: true
+  show_all_var_lines: true
+  enable_qq_plot: true
+  enable_tail_zoom: true
+
+correlation:
+  enabled: true
+  method: "pearson"                       # "pearson" | "spearman"
+  rolling_window: 90
+
+risk_free_rate:
+  mode: "manual"                          # "zero" | "manual" | "auto"
+  annual_rate: 0.05
+  day_count: 365

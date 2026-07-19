@@ -1,0 +1,42 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Coverage and build outputs
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Virtual environments and local environment variables
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Operating-system and notebook artifacts
+.DS_Store
+__MACOSX/
+.ipynb_checkpoints/
+
+# Local application secrets
+.streamlit/secrets.toml
+
+# Downloaded data and API caches
+data/cache/*
+!data/cache/.gitkeep
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Generated analysis artifacts
+outputs/*
+!outputs/.gitkeep
