@@ -13,6 +13,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from .risk_conventions import loss_value_to_return_threshold
+
 
 _BG_COLOR = "#f5f5f5"
 _PRIMARY = "#1f3b73"
@@ -52,9 +54,10 @@ def plot_return_distribution_with_var_cvar(
     returns : pandas.Series
         Daily (or horizon-matched) portfolio returns.
     var_value : float
-        Positive loss number (e.g. 0.042 for 4.2%).
+        Signed decimal loss value (e.g. 0.042 for a 4.2% loss).
     cvar_value : float
-        Positive loss number; expected to be >= ``var_value``.
+        Signed decimal loss value; expected to be >= ``var_value`` in loss
+        space.
     title : str, optional
     confidence_level : float, optional
         Used in annotations.
@@ -63,7 +66,7 @@ def plot_return_distribution_with_var_cvar(
     xlabel : str, optional
         X-axis label (e.g. ``"7-day Return"`` for a horizon-matched chart).
     extra_var_lines : dict[str, float] | None, optional
-        Optional ``{label: positive_loss}`` entries drawn as additional
+        Optional ``{label: signed_loss}`` entries drawn as additional
         vertical VaR lines with distinct dashed styles (used by the
         "Show all VaR lines" comparison).
 
@@ -72,8 +75,8 @@ def plot_return_distribution_with_var_cvar(
     matplotlib.figure.Figure
     """
     clean = returns.dropna().values
-    var_threshold = -float(var_value)
-    cvar_threshold = -float(cvar_value)
+    var_threshold = loss_value_to_return_threshold(var_value)
+    cvar_threshold = loss_value_to_return_threshold(cvar_value)
 
     fig, ax = plt.subplots(figsize=(10, 6), facecolor="white")
     _styled_axes(ax)
@@ -393,9 +396,10 @@ def plot_mc_loss_distribution(
     scenario_returns : pd.Series
         Simulated portfolio scenario returns (positive = gain, negative = loss).
     var_value : float
-        Positive loss number to mark as the VaR threshold.
+        Signed decimal loss value to mark as the VaR threshold.
     cvar_value : float
-        Positive loss number to mark as the CVaR (>= ``var_value``).
+        Signed decimal loss value to mark as the CVaR (>= ``var_value`` in
+        loss space).
     title : str, optional
     output_path : str | None, optional
 
@@ -404,8 +408,8 @@ def plot_mc_loss_distribution(
     matplotlib.figure.Figure
     """
     values = scenario_returns.to_numpy(dtype=float)
-    var_threshold = -float(var_value)
-    cvar_threshold = -float(cvar_value)
+    var_threshold = loss_value_to_return_threshold(var_value)
+    cvar_threshold = loss_value_to_return_threshold(cvar_value)
 
     fig, ax = plt.subplots(figsize=(10, 6), facecolor="white")
     _styled_axes(ax)
@@ -1192,11 +1196,17 @@ def plot_tail_zoom_distribution(
     if tail.size:
         ax.hist(tail, bins=30, color=_DANGER, edgecolor="white", alpha=0.7)
     ax.axvline(
-        -float(var_value), color=_PRIMARY, linestyle="--", linewidth=1.8,
+        loss_value_to_return_threshold(var_value),
+        color=_PRIMARY,
+        linestyle="--",
+        linewidth=1.8,
         label=f"VaR {confidence_level * 100:.0f}% = {var_value * 100:.2f}%",
     )
     ax.axvline(
-        -float(cvar_value), color="#7a0017", linestyle=":", linewidth=1.8,
+        loss_value_to_return_threshold(cvar_value),
+        color="#7a0017",
+        linestyle=":",
+        linewidth=1.8,
         label=f"CVaR {confidence_level * 100:.0f}% = {cvar_value * 100:.2f}%",
     )
 

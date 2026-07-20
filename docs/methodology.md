@@ -15,7 +15,9 @@ and log returns are not interchangeable when aggregating wealth or horizons.
 ## VaR and CVaR
 
 At confidence level `c`, the implementation evaluates the left tail at
-`alpha = 1 - c` and reports the negative return quantile in loss space.
+`alpha = 1 - c` and reports the negative return quantile in signed loss space.
+Outputs are decimal values: positive means loss, zero means break-even, and
+negative means the selected tail threshold remains profitable.
 
 - Historical VaR uses the empirical quantile.
 - Gaussian VaR uses the sample mean and standard deviation under Normality.
@@ -29,10 +31,10 @@ Cornish-Fisher is a truncated moment expansion. Extreme or unstable moment
 estimates can produce distorted or non-monotone quantiles; it must be compared
 with other methods rather than treated as automatically superior.
 
-The code currently permits signed results in unusual all-gain samples, while
-older documentation described every output as a positive loss number. The
-signed output contract must be formalized before `v1.0.0`; no formula is changed
-by this document.
+Negative VaR or CVaR is valid in an all-gain sample and must not be converted
+with `abs()` or silently clamped to zero. Monetary values preserve the same sign.
+See the [VaR and CVaR output contract](risk-measure-contract.md) for the exact
+sign, unit, horizon, backtesting, and optimization conventions.
 
 ## Horizon map
 

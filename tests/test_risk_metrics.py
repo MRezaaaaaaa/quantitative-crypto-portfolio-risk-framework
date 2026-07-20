@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from var_cvar_crypto_risk.risk_metrics import (
     calculate_max_drawdown,
@@ -62,6 +63,36 @@ def test_money_var_equals_pct_times_capital(long_returns: pd.Series) -> None:
     pct_value = float(pct_row["Value"].iloc[0]) / 100.0
     money_value = float(money_row["Value"].iloc[0])
     assert abs(money_value - pct_value * initial_capital) < 0.01
+
+
+def test_log_return_money_metrics_are_labeled_linearized(
+    long_returns: pd.Series,
+) -> None:
+    summary = generate_risk_summary(
+        portfolio_returns=long_returns,
+        confidence_level=0.95,
+        initial_capital=100_000.0,
+        var_methods=["historical"],
+        cvar_methods=["historical"],
+        return_method="log",
+    )
+    money_rows = summary[summary["Metric"].str.contains("Money")]
+    assert not money_rows.empty
+    assert set(money_rows["Unit"]) == {"USD (linearized)"}
+
+
+def test_risk_summary_rejects_unknown_return_method(
+    long_returns: pd.Series,
+) -> None:
+    with pytest.raises(ValueError, match="return_method"):
+        generate_risk_summary(
+            portfolio_returns=long_returns,
+            confidence_level=0.95,
+            initial_capital=100_000.0,
+            var_methods=["historical"],
+            cvar_methods=["historical"],
+            return_method="arithmetic",
+        )
 
 
 def test_max_drawdown_negative_for_volatile_series(long_returns: pd.Series) -> None:

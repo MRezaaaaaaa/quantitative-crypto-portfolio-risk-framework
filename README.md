@@ -72,10 +72,10 @@ PYTHONDONTWRITEBYTECODE=1 uv run --locked --no-sync python -m pytest \
   -p no:cacheprovider -q
 ```
 
-The current local baseline contains 245 passing tests, including one
-cross-module numerical golden test. This is a snapshot, not a permanent quality
-guarantee; GitHub Actions becomes the authoritative gate after the repository
-is pushed and its workflow completes successfully.
+The regression suite includes a cross-module numerical golden test. Local test
+counts are validation snapshots rather than permanent quality guarantees;
+GitHub Actions becomes the authoritative gate after the repository is pushed
+and its workflow completes successfully.
 
 ## Data
 
@@ -151,6 +151,8 @@ over Gaussian or Historical VaR. Likewise, Student-t scenarios introduce
 heavier tails but do not eliminate parameter or regime uncertainty.
 
 See [Methodology and horizon conventions](docs/methodology.md).
+The exact sign and unit rules are defined in the
+[VaR and CVaR output contract](docs/risk-measure-contract.md).
 
 ## Reproducing results
 
@@ -176,6 +178,9 @@ Dependency declarations and the committed lockfile workflow are documented in
   or survivorship bias.
 - Multi-day square-root/time-linear scaling assumes independent and identically
   distributed returns.
+- Some scenario-path and optimization plumbing assumes simple-return
+  arithmetic; the app-level boundary for log-return inputs remains a pre-1.0
+  release blocker.
 - Overlapping horizon observations reduce the effective sample size and are not
   appropriate for independence claims without qualification.
 - Expected-return estimates are noisy and can dominate optimized allocations.
@@ -194,8 +199,9 @@ See [Model risk](docs/model-risk.md) for the complete interpretation framework.
 Version `0.5.0` is a pre-1.0 research and development version. Work required
 before `v1.0.0` includes:
 
-- formalizing the signed VaR/CVaR output contract;
 - adding covariance-repair and solver-residual governance;
+- enforcing simple-versus-log return boundaries in scenario and optimization
+  workflows;
 - exercising the configured CI workflow on the future public GitHub remote;
 - adding security scanning and repository issue/PR templates;
 - raising coverage from the current 68% floor toward 80%;
@@ -207,6 +213,7 @@ See [CHANGELOG](CHANGELOG.md) and the specifications under `openspec/`.
 
 - [Architecture](docs/architecture.md)
 - [Methodology and horizons](docs/methodology.md)
+- [VaR and CVaR output contract](docs/risk-measure-contract.md)
 - [Model risk](docs/model-risk.md)
 - [Data provenance](docs/data-provenance.md)
 - [Reproducibility](docs/reproducibility.md)

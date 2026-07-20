@@ -11,8 +11,8 @@ Basel III market risk framework:
 A two-tier traffic light system (Basel III absolute counts and a generalised
 ratio-based variant) summarises model adequacy.
 
-All VaR values consumed and produced by this module are positive loss numbers
-(e.g. ``0.042`` means a 4.2% loss threshold).
+VaR forecasts use signed decimal loss space: positive = loss and negative =
+gain at the forecast threshold. The corresponding return threshold is ``-VaR``.
 """
 
 from __future__ import annotations
@@ -188,7 +188,7 @@ def rolling_var_forecast(
         Index is the DatetimeIndex of forecast dates. Columns:
 
         - ``actual_return`` : float — realised h-day return starting at the date.
-        - ``var_forecast``  : float — positive h-day VaR estimate.
+        - ``var_forecast``  : float — signed h-day loss-space VaR estimate.
         - ``breach``        : bool  — ``actual_return < -var_forecast``.
         - ``horizon_days``  : int   — the configured horizon.
         - ``method``        : str   — the VaR method used.

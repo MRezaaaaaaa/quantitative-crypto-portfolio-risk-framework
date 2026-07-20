@@ -117,6 +117,7 @@ def generate_risk_summary(
     var_methods: list[str],
     cvar_methods: list[str],
     periods_per_year: int = 365,
+    return_method: str = "simple",
 ) -> pd.DataFrame:
     """Generate the complete risk summary table.
 
@@ -125,13 +126,19 @@ def generate_risk_summary(
     pandas.DataFrame
         Columns ``["Metric", "Value", "Unit"]``. ``Value`` is the raw
         numeric value (already converted to percentage points or USD as
-        appropriate), and ``Unit`` describes its interpretation.
+        appropriate), and ``Unit`` describes its interpretation. Monetary
+        values are labeled as linearized when ``return_method="log"``.
     """
+    if return_method not in {"simple", "log"}:
+        raise ValueError(
+            f"return_method must be 'simple' or 'log', got {return_method}."
+        )
     stats_dict = calculate_distribution_stats(
         portfolio_returns, periods_per_year=periods_per_year
     )
     max_dd = calculate_max_drawdown(portfolio_returns)
     confidence_pct = confidence_level * 100.0
+    money_unit = "USD" if return_method == "simple" else "USD (linearized)"
 
     rows: list[dict] = [
         {
@@ -193,7 +200,7 @@ def generate_risk_summary(
             {
                 "Metric": f"{label} Money VaR {confidence_pct:.0f}%",
                 "Value": money_var,
-                "Unit": "USD",
+                "Unit": money_unit,
             }
         )
 
@@ -212,7 +219,7 @@ def generate_risk_summary(
             {
                 "Metric": f"{label} Money CVaR {confidence_pct:.0f}%",
                 "Value": money_cvar,
-                "Unit": "USD",
+                "Unit": money_unit,
             }
         )
 

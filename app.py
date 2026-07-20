@@ -112,6 +112,10 @@ from var_cvar_crypto_risk.risk_metrics import (  # noqa: E402
     calculate_max_drawdown,
     generate_risk_summary,
 )
+from var_cvar_crypto_risk.risk_conventions import (  # noqa: E402
+    LOSS_SPACE_CONVENTION,
+    loss_value_to_money,
+)
 from var_cvar_crypto_risk.utils import annual_to_horizon_rate  # noqa: E402
 from var_cvar_crypto_risk.var_models import calculate_var  # noqa: E402
 from var_cvar_crypto_risk.views import (  # noqa: E402
@@ -537,6 +541,7 @@ if run:
             initial_capital=initial_capital,
             var_methods=selected_var_methods,
             cvar_methods=selected_cvar_methods,
+            return_method=returns_method,
         )
     except CoinGeckoError as exc:
         st.error(f"CoinGecko error: {exc}")
@@ -614,6 +619,12 @@ m4.metric("Max drawdown", f"{max_dd * 100:.2f}%")
 # ─── Headline VaR / CVaR cards ────────────────────────────────────────────
 
 st.subheader(f"🎯 VaR & CVaR at {confidence_level * 100:.1f}% confidence")
+st.caption(f"Sign convention — {LOSS_SPACE_CONVENTION}")
+if returns_method == "log":
+    st.caption(
+        "Monetary deltas are linearized as risk value × capital; they are not "
+        "exact transformed tail P&L for log returns."
+    )
 
 import numpy as np  # noqa: E402
 
@@ -624,7 +635,7 @@ card_cols = st.columns(max(1, len(selected_var_methods) + len(selected_cvar_meth
 idx = 0
 for method in selected_var_methods:
     var_pct = calculate_var(portfolio_returns, method, confidence_level) * scale
-    money_var = var_pct * initial_capital
+    money_var = loss_value_to_money(var_pct, initial_capital)
     card_cols[idx].metric(
         f"{METHOD_LABELS[method]} VaR ({horizon_label})",
         f"{var_pct * 100:.2f}%",
@@ -634,7 +645,7 @@ for method in selected_var_methods:
     idx += 1
 for method in selected_cvar_methods:
     cvar_pct = calculate_cvar(portfolio_returns, method, confidence_level) * scale
-    money_cvar = cvar_pct * initial_capital
+    money_cvar = loss_value_to_money(cvar_pct, initial_capital)
     card_cols[idx].metric(
         f"{METHOD_LABELS[method]} CVaR ({horizon_label})",
         f"{cvar_pct * 100:.2f}%",
@@ -2080,8 +2091,8 @@ with tab_mc:
 
         primary_var = scenario_var(pf_selected, mc_conf_used)
         primary_cvar = scenario_cvar(pf_selected, mc_conf_used)
-        money_var = primary_var * float(initial_capital)
-        money_cvar = primary_cvar * float(initial_capital)
+        money_var = loss_value_to_money(primary_var, initial_capital)
+        money_cvar = loss_value_to_money(primary_cvar, initial_capital)
 
         m_row = st.columns(5)
         m_row[0].metric(

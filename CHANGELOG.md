@@ -8,6 +8,10 @@ Versioning when it reaches a public release.
 
 ### Added
 
+- Canonical signed-loss conversion helpers and contract tests for VaR, CVaR,
+  return thresholds, and monetary values.
+- Public documentation for VaR/CVaR sign, unit, horizon, backtesting, and
+  optimization conventions.
 - Repository governance and release-hygiene files.
 - Focused architecture, methodology, model-risk, data-provenance, and
   reproducibility documentation.
@@ -25,6 +29,11 @@ Versioning when it reaches a public release.
 
 ### Changed
 
+- Standardized analytical, scenario, optimization, reporting, plotting, and UI
+  descriptions on signed loss space without changing the underlying risk
+  formulas.
+- Labeled monetary VaR/CVaR derived from log-return metrics as linearized
+  equivalents rather than exact transformed tail P&L.
 - Corrected all-breach and no-breach Christoffersen results from a synthetic
   pass to an explicit inconclusive result, propagated through conditional
   coverage, reporting, and the Streamlit presentation.

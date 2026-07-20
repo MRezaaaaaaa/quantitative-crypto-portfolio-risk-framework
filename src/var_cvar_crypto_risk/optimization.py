@@ -12,8 +12,8 @@ Conventions
 * ``scenario_returns`` is a ``pandas.DataFrame`` with one **scenario per
   row** and one **asset per column**.
 * Portfolio scenario return is ``R @ w``; scenario loss is ``-R @ w``.
-* VaR and CVaR are reported as **positive loss numbers**
-  (e.g. ``0.082`` ↦ 8.2 % loss).
+* VaR and CVaR are reported as signed decimal loss values: positive = loss,
+  zero = break-even, and negative = gain at the measured tail threshold.
 * For confidence level ``β``, CVaR is
 
   .. math::
@@ -38,6 +38,7 @@ from .monte_carlo import (
     simulate_normal_returns,
     simulate_student_t_returns,
 )
+from .risk_conventions import loss_value_to_money
 
 
 # Solver preference: keep open-source. ECOS is preferred when present (faster
@@ -381,9 +382,8 @@ def calculate_portfolio_scenario_metrics(
         "n_scenarios": int(portfolio.size),
     }
     if initial_capital is not None:
-        cap = float(initial_capital)
-        metrics["money_VaR"] = var * cap
-        metrics["money_CVaR"] = cvar * cap
+        metrics["money_VaR"] = loss_value_to_money(var, initial_capital)
+        metrics["money_CVaR"] = loss_value_to_money(cvar, initial_capital)
     return metrics
 
 
@@ -678,8 +678,9 @@ def maximize_return_with_cvar_constraint(
 ) -> dict:
     """Maximize expected return subject to ``CVaR(w) <= cvar_limit``.
 
-    ``cvar_limit`` is a positive loss number (e.g. ``0.10`` ↦ at most a
-    10 % CVaR loss).
+    ``cvar_limit`` is intentionally restricted to a positive loss budget
+    (e.g. ``0.10`` means at most a 10% CVaR loss), although reported CVaR
+    values follow the signed loss-space output contract.
     """
     validate_scenario_matrix(scenario_returns)
     if not (0.0 < confidence_level < 1.0):

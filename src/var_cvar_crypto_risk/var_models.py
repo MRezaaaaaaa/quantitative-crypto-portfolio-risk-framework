@@ -1,7 +1,7 @@
 """Value-at-Risk (VaR) models.
 
-All VaR values are returned as **positive loss numbers**. For example,
-a VaR of ``0.042`` represents a 4.2% loss threshold.
+VaR is returned as a decimal value in signed loss space. ``0.042`` represents
+a 4.2% loss threshold; ``-0.02`` represents a 2% gain threshold.
 """
 
 from __future__ import annotations
@@ -11,6 +11,11 @@ from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 from scipy import stats
+
+from .risk_conventions import (
+    loss_value_to_money,
+    return_threshold_to_loss_value,
+)
 
 
 class VaRModel(ABC):
@@ -25,12 +30,13 @@ class VaRModel(ABC):
         returns: pd.Series,
         confidence_level: float,
     ) -> float:
-        """Compute 1-day VaR.
+        """Compute VaR for the observation horizon of ``returns``.
 
         Returns
         -------
         float
-            VaR as a positive loss number. ``0.042`` means a 4.2% loss threshold.
+            Signed decimal loss value. Positive values are losses and negative
+            values are gains at the VaR threshold.
         """
 
     def validate_confidence(self, confidence_level: float) -> None:
@@ -55,7 +61,7 @@ class HistoricalVaR(VaRModel):
             raise ValueError("Cannot compute Historical VaR on empty return series.")
         alpha = 1.0 - confidence_level
         threshold = float(np.quantile(clean.values, alpha))
-        return -threshold
+        return return_threshold_to_loss_value(threshold)
 
 
 class GaussianVaR(VaRModel):
@@ -75,8 +81,8 @@ class GaussianVaR(VaRModel):
         mu = float(clean.mean())
         sigma = float(clean.std(ddof=1))
         z = stats.norm.ppf(1.0 - confidence_level)
-        var_value = -(mu + sigma * z)
-        return var_value
+        return_threshold = mu + sigma * z
+        return return_threshold_to_loss_value(return_threshold)
 
 
 class CornishFisherVaR(VaRModel):
@@ -113,8 +119,8 @@ class CornishFisherVaR(VaRModel):
             + (z**3 - 3.0 * z) * excess_kurt / 24.0
             - (2.0 * z**3 - 5.0 * z) * (skewness**2) / 36.0
         )
-        var_value = -(mu + sigma * z_cf)
-        return var_value
+        return_threshold = mu + sigma * z_cf
+        return return_threshold_to_loss_value(return_threshold)
 
 
 _HISTORICAL = HistoricalVaR()
@@ -186,9 +192,9 @@ def scale_var_to_horizon(var_1day: float, horizon_days: int) -> float:
 
 
 def return_var_to_money_var(var_return: float, portfolio_value: float) -> float:
-    """Convert a return-based VaR to a monetary VaR.
+    """Convert signed decimal VaR to monetary VaR in portfolio currency.
 
     Formula: ``money_var = var_return * portfolio_value``.
-    e.g. a VaR of 4.2% on a $100,000 portfolio is $4,200.
+    The sign is preserved: positive means loss and negative means gain.
     """
-    return var_return * portfolio_value
+    return loss_value_to_money(var_return, portfolio_value)

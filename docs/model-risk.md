@@ -29,6 +29,11 @@ target and intensity. None is universally correct.
 
 ## Distribution and tail risk
 
+- VaR and CVaR use signed loss space. A negative value represents a tail gain,
+  not a calculation error; forcing every result positive would misstate the
+  modeled return threshold.
+- Multiplying a log-return risk value by capital is a linearized monetary
+  equivalent, not exact scenario-level tail P&L.
 - Gaussian models underrepresent skewness, jumps, and heavy tails.
 - Student-t models add heavy tails but retain a fixed parametric structure.
 - Historical simulation cannot generate events absent from the sample.

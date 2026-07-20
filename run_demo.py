@@ -212,6 +212,7 @@ def _run_core_risk(config: dict, output_dir: str) -> tuple[
         initial_capital=float(config["portfolio"]["initial_capital"]),
         var_methods=config["risk"]["var_methods"],
         cvar_methods=config["risk"]["cvar_methods"],
+        return_method=returns_method,
     )
 
     saved: list[str] = []

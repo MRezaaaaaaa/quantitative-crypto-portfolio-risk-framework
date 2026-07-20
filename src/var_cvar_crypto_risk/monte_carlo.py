@@ -7,7 +7,7 @@ Capabilities
 * Estimate mean / covariance / volatility from historical asset returns.
 * Simulate multivariate scenario returns under Normal or Student-t laws.
 * Aggregate scenario asset returns into portfolio scenario returns.
-* Compute scenario-based VaR and CVaR as **positive loss numbers**.
+* Compute scenario-based VaR and CVaR in signed loss space.
 * Simulate portfolio value paths over a forward horizon.
 * Compare Normal vs Student-t Monte Carlo in one call.
 * Compare every available risk method (Historical / Gaussian /
@@ -15,8 +15,8 @@ Capabilities
 
 Conventions
 -----------
-* All VaR / CVaR values returned by this module are positive losses
-  (e.g. ``0.082`` means an 8.2% loss threshold).
+* VaR / CVaR values are decimal signed losses: positive = loss, zero =
+  break-even, and negative = gain at the measured tail threshold.
 * For ``horizon_days > 1`` the parametric drift and dispersion of the
   multivariate simulators are scaled as ``mean * horizon`` and
   ``cov * horizon`` (i.i.d. approximation).
@@ -31,6 +31,10 @@ import numpy as np
 import pandas as pd
 
 from .cvar_models import calculate_cvar
+from .risk_conventions import (
+    loss_value_to_money,
+    return_threshold_to_loss_value,
+)
 from .var_models import calculate_var
 
 
@@ -299,7 +303,7 @@ def scenario_var(
     scenario_returns: pd.Series,
     confidence_level: float = 0.95,
 ) -> float:
-    """Scenario-based VaR (positive loss number)."""
+    """Scenario-based VaR as a signed decimal loss value."""
     if not isinstance(scenario_returns, pd.Series):
         raise ValueError("scenario_returns must be a pd.Series.")
     if scenario_returns.empty:
@@ -310,14 +314,14 @@ def scenario_var(
         )
     alpha = 1.0 - float(confidence_level)
     threshold = float(np.quantile(scenario_returns.to_numpy(dtype=float), alpha))
-    return -threshold
+    return return_threshold_to_loss_value(threshold)
 
 
 def scenario_cvar(
     scenario_returns: pd.Series,
     confidence_level: float = 0.95,
 ) -> float:
-    """Scenario-based CVaR (positive loss number); ``CVaR >= VaR``."""
+    """Scenario-based CVaR in signed loss space; ``CVaR >= VaR``."""
     if not isinstance(scenario_returns, pd.Series):
         raise ValueError("scenario_returns must be a pd.Series.")
     if scenario_returns.empty:
@@ -335,7 +339,7 @@ def scenario_cvar(
             "No tail observations found for scenario CVaR. "
             "Increase n_scenarios or lower confidence_level."
         )
-    return -float(tail.mean())
+    return return_threshold_to_loss_value(float(tail.mean()))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -411,14 +415,14 @@ def monte_carlo_risk_summary(
         rows.append(
             {
                 "Metric": f"{label} Money VaR {confidence_pct:.0f}%",
-                "Value": var * float(initial_capital),
+                "Value": loss_value_to_money(var, initial_capital),
                 "Unit": "USD",
             }
         )
         rows.append(
             {
                 "Metric": f"{label} Money CVaR {confidence_pct:.0f}%",
-                "Value": cvar * float(initial_capital),
+                "Value": loss_value_to_money(cvar, initial_capital),
                 "Unit": "USD",
             }
         )
@@ -608,8 +612,8 @@ def compare_all_risk_methods(
     -------
     pd.DataFrame
         Columns ``Method``, ``VaR``, ``CVaR``, ``Confidence Level``,
-        ``Horizon Days``, ``Notes``. ``VaR`` and ``CVaR`` are positive loss
-        numbers as decimals (e.g. ``0.082`` = 8.2%).
+        ``Horizon Days``, ``Notes``. ``VaR`` and ``CVaR`` are signed decimal
+        loss values (e.g. ``0.082`` = 8.2% loss; ``-0.02`` = 2% gain).
     """
     h = int(horizon_days)
     if h < 1:

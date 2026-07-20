@@ -1,7 +1,8 @@
 """Conditional Value-at-Risk (CVaR / Expected Shortfall) models.
 
-All CVaR values are returned as **positive loss numbers**.
-For the same data and confidence level, ``CVaR >= VaR`` always holds.
+CVaR is returned as a decimal value in signed loss space. Positive values are
+losses and negative values are gains. For matching methods and confidence
+levels, ``CVaR >= VaR`` in loss space.
 """
 
 from __future__ import annotations
@@ -11,6 +12,11 @@ from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
 from scipy import stats
+
+from .risk_conventions import (
+    loss_value_to_money,
+    return_threshold_to_loss_value,
+)
 
 
 class CVaRModel(ABC):
@@ -25,13 +31,14 @@ class CVaRModel(ABC):
         returns: pd.Series,
         confidence_level: float,
     ) -> float:
-        """Compute 1-day CVaR (Expected Shortfall).
+        """Compute CVaR for the observation horizon of ``returns``.
 
         Returns
         -------
         float
-            CVaR as a positive loss number. ``CVaR >= VaR`` for the same
-            method and confidence level.
+            Signed decimal loss value. Positive values are losses and negative
+            values are gains. ``CVaR >= VaR`` in loss space for matching
+            methods and confidence levels.
         """
 
     def validate_confidence(self, confidence_level: float) -> None:
@@ -62,7 +69,7 @@ class HistoricalCVaR(CVaRModel):
                 "No tail observations found for Historical CVaR. "
                 "Increase the sample size or lower the confidence level."
             )
-        return -float(tail.mean())
+        return return_threshold_to_loss_value(float(tail.mean()))
 
 
 class GaussianCVaR(CVaRModel):
@@ -87,8 +94,8 @@ class GaussianCVaR(CVaRModel):
         alpha = 1.0 - confidence_level
         z = stats.norm.ppf(alpha)
         pdf_z = stats.norm.pdf(z)
-        cvar_value = -(mu - sigma * pdf_z / alpha)
-        return cvar_value
+        tail_return = mu - sigma * pdf_z / alpha
+        return return_threshold_to_loss_value(tail_return)
 
 
 _HISTORICAL = HistoricalCVaR()
@@ -137,5 +144,5 @@ def calculate_cvar(
 
 
 def return_cvar_to_money_cvar(cvar_return: float, portfolio_value: float) -> float:
-    """Convert a return-based CVaR to a monetary CVaR."""
-    return cvar_return * portfolio_value
+    """Convert signed decimal CVaR to monetary CVaR, preserving its sign."""
+    return loss_value_to_money(cvar_return, portfolio_value)
