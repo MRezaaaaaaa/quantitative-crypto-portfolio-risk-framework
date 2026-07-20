@@ -35,6 +35,7 @@ returns.py and portfolio.py
 | `coingecko_client.py`, `yfinance_client.py` | Vendor-specific price retrieval. |
 | `data_loader.py`, `preprocessing.py` | Normalize and validate price data. |
 | `returns.py`, `portfolio.py` | Return conventions, horizon aggregation, weights, and portfolio series. |
+| `return_conventions.py` | Resolve the Automatic/Advanced return policy and calculation boundaries. |
 | `var_models.py`, `cvar_models.py`, `risk_metrics.py` | Core risk measures. |
 | `backtesting.py` | Rolling forecasts, breaches, coverage tests, and reports. |
 | `monte_carlo.py` | Parameter estimates, scenarios, paths, and scenario risk. |
@@ -88,5 +89,7 @@ and attach data provenance to each result.
 2. Vendor clients must not contain portfolio or risk calculations.
 3. Plotting must consume results rather than recompute them.
 4. All horizon conversions must be explicit and tested.
-5. Methodology changes and architectural refactors must not share a commit.
-6. Generated data, caches, and reports must remain outside version control.
+5. Scenario, wealth, and optimization boundaries must reject Log inputs rather
+   than silently applying Simple-return arithmetic.
+6. Methodology changes and architectural refactors must not share a commit.
+7. Generated data, caches, and reports must remain outside version control.

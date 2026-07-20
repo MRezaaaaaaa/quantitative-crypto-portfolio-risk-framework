@@ -34,6 +34,9 @@ target and intensity. None is universally correct.
   modeled return threshold.
 - Multiplying a log-return risk value by capital is a linearized monetary
   equivalent, not exact scenario-level tail P&L.
+- The application avoids that ambiguity in core results by using Simple
+  returns for monetary risk, wealth paths, scenarios, and optimization. Log is
+  an Advanced-mode distribution diagnostic only.
 - Gaussian models underrepresent skewness, jumps, and heavy tails.
 - Student-t models add heavy tails but retain a fixed parametric structure.
 - Historical simulation cannot generate events absent from the sample.

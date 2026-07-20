@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 
@@ -76,31 +77,61 @@ def normalize_weights(weights: pd.Series) -> pd.Series:
 def calculate_portfolio_returns(
     returns: pd.DataFrame,
     weights: pd.Series,
+    return_method: str = "simple",
 ) -> pd.Series:
-    """Calculate daily portfolio returns as a weighted sum of asset returns.
+    """Calculate exact daily portfolio returns under the input convention.
 
-    Formula: ``r_p_t = sum_i (w_i * r_i_t)``.
+    Simple asset returns aggregate arithmetically as
+    ``r_p_t = sum_i (w_i * r_i_t)``. For log-return inputs, asset gross
+    returns are reconstructed first and the exact portfolio log return is
+    ``log(1 + sum_i(w_i * (exp(g_i_t) - 1)))``. A weighted sum of asset log
+    returns is not used because it is generally not the portfolio log return.
     """
+    if return_method not in {"simple", "log"}:
+        raise ValueError(
+            "return_method must be 'simple' or 'log', "
+            f"got {return_method!r}."
+        )
     aligned_weights = weights.reindex(returns.columns)
     if aligned_weights.isna().any():
         missing = aligned_weights[aligned_weights.isna()].index.tolist()
         raise ValueError(
             f"Weights missing for return columns: {missing}"
         )
-    portfolio = returns.values @ aligned_weights.values
+    values = returns.to_numpy(dtype=float)
+    weights_array = aligned_weights.to_numpy(dtype=float)
+    if return_method == "simple":
+        portfolio = values @ weights_array
+    else:
+        simple_portfolio = np.expm1(values) @ weights_array
+        if np.any(simple_portfolio <= -1.0):
+            raise ValueError(
+                "Log portfolio return is undefined because the reconstructed "
+                "simple portfolio return is <= -1."
+            )
+        portfolio = np.log1p(simple_portfolio)
     return pd.Series(portfolio, index=returns.index, name="portfolio_return")
 
 
 def calculate_portfolio_value(
     portfolio_returns: pd.Series,
     initial_capital: float,
+    return_method: str = "simple",
 ) -> pd.Series:
-    """Calculate portfolio value over time.
+    """Calculate portfolio value from simple or log portfolio returns.
 
-    Formula: ``V_t = initial_capital * (1 + r).cumprod()``.
-    The first value equals ``initial_capital * (1 + r_0)``.
+    Simple-return formula: ``V_t = V_0 * (1 + r).cumprod()``.
+    Log-return formula: ``V_t = V_0 * exp(g.cumsum())``.
     """
-    growth = (1.0 + portfolio_returns).cumprod()
+    if return_method not in {"simple", "log"}:
+        raise ValueError(
+            "return_method must be 'simple' or 'log', "
+            f"got {return_method!r}."
+        )
+    if return_method == "simple":
+        growth = (1.0 + portfolio_returns).cumprod()
+    else:
+        growth = np.exp(portfolio_returns.cumsum())
     value = initial_capital * growth
     value.name = "portfolio_value"
     return value

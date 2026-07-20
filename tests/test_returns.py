@@ -102,3 +102,15 @@ def test_cumulative_returns_dataframe_preserves_columns(sample_returns: pd.DataF
     cum = calculate_cumulative_returns(sample_returns)
     assert list(cum.columns) == list(sample_returns.columns)
     assert cum.shape == sample_returns.shape
+
+
+def test_cumulative_log_returns_match_simple_compounding() -> None:
+    simple = pd.Series([0.10, -0.05, 0.02])
+    expected = calculate_cumulative_returns(simple, method="simple")
+    actual = calculate_cumulative_returns(np.log1p(simple), method="log")
+    pd.testing.assert_series_equal(actual, expected)
+
+
+def test_cumulative_returns_reject_unknown_method() -> None:
+    with pytest.raises(ValueError, match="Unknown method"):
+        calculate_cumulative_returns(pd.Series([0.01]), method="arithmetic")

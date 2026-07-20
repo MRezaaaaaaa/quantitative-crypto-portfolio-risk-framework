@@ -264,6 +264,7 @@ def simulate_student_t_returns(
 def calculate_portfolio_scenario_returns(
     scenario_returns: pd.DataFrame,
     weights: pd.Series,
+    return_method: str = "simple",
 ) -> pd.Series:
     """Aggregate asset scenario returns into portfolio scenario returns.
 
@@ -273,6 +274,9 @@ def calculate_portfolio_scenario_returns(
         Scenarios as rows, assets as columns.
     weights : pd.Series
         Indexed by asset symbol. Must cover every column.
+    return_method : {"simple"}
+        Scenario aggregation is arithmetic and therefore requires simple
+        asset returns.
 
     Returns
     -------
@@ -285,6 +289,11 @@ def calculate_portfolio_scenario_returns(
         raise ValueError("scenario_returns is empty.")
     if not isinstance(weights, pd.Series):
         raise ValueError("weights must be a pd.Series.")
+    if return_method != "simple":
+        raise ValueError(
+            "calculate_portfolio_scenario_returns requires simple-return "
+            "inputs; convert log returns before calling."
+        )
 
     aligned = weights.reindex(scenario_returns.columns)
     if aligned.isna().any():
@@ -444,6 +453,7 @@ def simulate_portfolio_paths(
     distribution: str = "normal",
     df: float = 5,
     random_seed: int | None = 42,
+    return_method: str = "simple",
 ) -> pd.DataFrame:
     """Simulate portfolio value paths over a forward horizon.
 
@@ -463,9 +473,16 @@ def simulate_portfolio_paths(
         Student-t degrees of freedom. Used only when
         ``distribution == "student_t"``. Must be ``> 2``.
     random_seed : int or None, optional
+    return_method : {"simple"}
+        Simulated innovations are compounded arithmetically into wealth paths.
     """
     if initial_value <= 0:
         raise ValueError(f"initial_value must be > 0, got {initial_value}.")
+    if return_method != "simple":
+        raise ValueError(
+            "simulate_portfolio_paths requires simple-return inputs and "
+            "innovations; log-return compounding is not accepted here."
+        )
     if horizon_days < 1:
         raise ValueError(f"horizon_days must be >= 1, got {horizon_days}.")
     if n_paths <= 0:
@@ -598,6 +615,7 @@ def compare_all_risk_methods(
     n_scenarios: int = 5000,
     student_t_df: float = 5,
     random_seed: int | None = 42,
+    return_method: str = "simple",
 ) -> pd.DataFrame:
     """Compare Historical / Gaussian / Cornish-Fisher / Normal MC / Student-t MC.
 
@@ -615,6 +633,11 @@ def compare_all_risk_methods(
         ``Horizon Days``, ``Notes``. ``VaR`` and ``CVaR`` are signed decimal
         loss values (e.g. ``0.082`` = 8.2% loss; ``-0.02`` = 2% gain).
     """
+    if return_method != "simple":
+        raise ValueError(
+            "compare_all_risk_methods requires simple-return inputs; convert "
+            "log returns before calling."
+        )
     h = int(horizon_days)
     if h < 1:
         raise ValueError(f"horizon_days must be >= 1, got {h}.")

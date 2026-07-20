@@ -103,6 +103,9 @@ from var_cvar_crypto_risk.portfolio import (  # noqa: E402
     validate_weights,
 )
 from var_cvar_crypto_risk.preprocessing import clean_price_data  # noqa: E402
+from var_cvar_crypto_risk.return_conventions import (  # noqa: E402
+    resolve_return_policy,
+)
 from var_cvar_crypto_risk.returns import (  # noqa: E402
     calculate_horizon_returns,
     calculate_returns,
@@ -134,6 +137,7 @@ METHOD_LABELS = {
     "gaussian": "Gaussian",
     "cornish_fisher": "Cornish-Fisher",
 }
+RETURN_CONTRACT_VERSION = 1
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────
@@ -338,6 +342,7 @@ def _scenario_matrix_cached(
         student_t_df=float(student_t_df),
         random_seed=int(random_seed),
         covariance_matrix=covariance_matrix,
+        return_method="simple",
     )
 
 
@@ -400,7 +405,32 @@ with st.sidebar:
 
     st.divider()
     st.subheader("Returns & portfolio")
-    returns_method = st.selectbox("Return method", ["simple", "log"], index=0)
+    return_handling_mode = st.selectbox(
+        "Return handling",
+        ["automatic", "advanced"],
+        format_func=lambda value: value.title(),
+        help=(
+            "Automatic uses simple returns throughout. Advanced can use log "
+            "returns for distribution diagnostics only."
+        ),
+    )
+    if return_handling_mode == "advanced":
+        diagnostic_return_method = st.selectbox(
+            "Diagnostic return convention",
+            ["simple", "log"],
+            format_func=lambda value: value.title(),
+        )
+    else:
+        diagnostic_return_method = "simple"
+    return_policy = resolve_return_policy(
+        return_handling_mode,
+        diagnostic_method=diagnostic_return_method,
+    )
+    st.caption(
+        "Portfolio construction, NAV, risk monitoring, Monte Carlo, and "
+        "optimization always use simple returns. Advanced Log affects only "
+        "distribution diagnostics."
+    )
     initial_capital = st.number_input(
         "Initial capital (USD)",
         min_value=100.0,
@@ -531,9 +561,30 @@ if run:
             allow_short_selling=allow_short,
         )
 
-        asset_returns = calculate_returns(prices, method=returns_method)
-        portfolio_returns = calculate_portfolio_returns(asset_returns, weights)
-        portfolio_value = calculate_portfolio_value(portfolio_returns, initial_capital)
+        asset_returns = calculate_returns(
+            prices,
+            method=return_policy.portfolio_method,
+        )
+        portfolio_returns = calculate_portfolio_returns(
+            asset_returns,
+            weights,
+            return_method=return_policy.portfolio_method,
+        )
+        portfolio_value = calculate_portfolio_value(
+            portfolio_returns,
+            initial_capital,
+            return_method=return_policy.wealth_method,
+        )
+        diagnostic_asset_returns = (
+            asset_returns
+            if return_policy.diagnostic_method == "simple"
+            else calculate_returns(prices, method="log")
+        )
+        diagnostic_portfolio_returns = calculate_portfolio_returns(
+            diagnostic_asset_returns,
+            weights,
+            return_method=return_policy.diagnostic_method,
+        )
 
         risk_summary = generate_risk_summary(
             portfolio_returns=portfolio_returns,
@@ -541,7 +592,7 @@ if run:
             initial_capital=initial_capital,
             var_methods=selected_var_methods,
             cvar_methods=selected_cvar_methods,
-            return_method=returns_method,
+            return_method=return_policy.portfolio_method,
         )
     except CoinGeckoError as exc:
         st.error(f"CoinGecko error: {exc}")
@@ -557,9 +608,12 @@ if run:
         st.warning(warning_msg)
 
     st.session_state["risk_results"] = {
+        "return_contract_version": RETURN_CONTRACT_VERSION,
         "prices": prices,
         "asset_returns": asset_returns,
         "portfolio_returns": portfolio_returns,
+        "diagnostic_asset_returns": diagnostic_asset_returns,
+        "diagnostic_portfolio_returns": diagnostic_portfolio_returns,
         "portfolio_value": portfolio_value,
         "risk_summary": risk_summary,
         "used_source": used_source,
@@ -570,7 +624,9 @@ if run:
         "selected_var_methods": list(selected_var_methods),
         "selected_cvar_methods": list(selected_cvar_methods),
         "horizon_days": horizon_days,
-        "returns_method": returns_method,
+        "return_handling_mode": return_policy.handling_mode,
+        "diagnostic_return_method": return_policy.diagnostic_method,
+        "returns_method": return_policy.diagnostic_method,
     }
     st.session_state["backtest_results"] = None
     st.session_state["mc_results"] = None
@@ -578,6 +634,20 @@ if run:
     st.session_state["assumptions_results"] = None
 
 results = st.session_state.get("risk_results")
+if (
+    results is not None
+    and results.get("return_contract_version") != RETURN_CONTRACT_VERSION
+):
+    st.session_state["risk_results"] = None
+    st.session_state["backtest_results"] = None
+    st.session_state["mc_results"] = None
+    st.session_state["opt_results"] = None
+    st.session_state["assumptions_results"] = None
+    results = None
+    st.info(
+        "The return-convention contract changed. Run the analysis again to "
+        "rebuild all results with Simple-return core inputs."
+    )
 if results is None:
     st.info("Configure inputs in the sidebar and click **Run risk analysis**.")
     st.stop()
@@ -585,6 +655,10 @@ if results is None:
 prices = results["prices"]
 asset_returns = results["asset_returns"]
 portfolio_returns = results["portfolio_returns"]
+diagnostic_asset_returns = results.get("diagnostic_asset_returns", asset_returns)
+diagnostic_portfolio_returns = results.get(
+    "diagnostic_portfolio_returns", portfolio_returns
+)
 portfolio_value = results["portfolio_value"]
 risk_summary = results["risk_summary"]
 used_source = results["used_source"]
@@ -594,7 +668,11 @@ initial_capital = results["initial_value"]
 selected_var_methods = results["selected_var_methods"]
 selected_cvar_methods = results["selected_cvar_methods"]
 horizon_days = results["horizon_days"]
-returns_method = results.get("returns_method", "simple")
+return_handling_mode = results.get("return_handling_mode", "automatic")
+diagnostic_return_method = results.get(
+    "diagnostic_return_method",
+    results.get("returns_method", "simple"),
+)
 
 
 # ─── Run summary ──────────────────────────────────────────────────────────
@@ -602,6 +680,11 @@ returns_method = results.get("returns_method", "simple")
 st.success(
     f"Loaded {len(prices):,} price rows × {prices.shape[1]} assets "
     f"from **{used_source}** ({prices.index.min().date()} → {prices.index.max().date()})."
+)
+st.caption(
+    "Return conventions — core portfolio/NAV/scenarios/optimization: "
+    f"**Simple** · diagnostics: **{diagnostic_return_method.title()}** · "
+    f"mode: **{return_handling_mode.title()}**"
 )
 
 obs = len(portfolio_returns)
@@ -619,12 +702,10 @@ m4.metric("Max drawdown", f"{max_dd * 100:.2f}%")
 # ─── Headline VaR / CVaR cards ────────────────────────────────────────────
 
 st.subheader(f"🎯 VaR & CVaR at {confidence_level * 100:.1f}% confidence")
-st.caption(f"Sign convention — {LOSS_SPACE_CONVENTION}")
-if returns_method == "log":
-    st.caption(
-        "Monetary deltas are linearized as risk value × capital; they are not "
-        "exact transformed tail P&L for log returns."
-    )
+st.caption(
+    f"Sign convention — {LOSS_SPACE_CONVENTION} Headline risk uses simple "
+    "portfolio returns."
+)
 
 import numpy as np  # noqa: E402
 
@@ -751,11 +832,19 @@ with tab_dist:
                 f"Distribution is horizon-matched: it shows realised "
                 f"**{h}-day** returns (not √t-scaled daily VaR)."
             )
+        st.caption(
+            "Diagnostic convention: "
+            f"**{diagnostic_return_method.title()} returns**. Log mode is "
+            "diagnostic only and does not alter NAV, risk monitoring, "
+            "Monte Carlo, or optimization."
+        )
 
         # Horizon-matched portfolio returns (h == 1 ⇒ daily, unchanged).
         # Served from the shared cache — same series every tab, no recompute.
         dist_returns = _horizon_returns_cached(
-            portfolio_returns, h, returns_method
+            diagnostic_portfolio_returns,
+            h,
+            diagnostic_return_method,
         )
 
         primary_var = selected_var_methods[0]
@@ -798,9 +887,10 @@ with tab_dist:
 
         if dist_scope in ("Asset-level", "Both"):
             fig_assets = plot_asset_return_distributions(
-                asset_returns,
+                diagnostic_asset_returns,
                 horizon_days=h,
                 confidence_level=confidence_level,
+                return_method=diagnostic_return_method,
             )
             st.pyplot(fig_assets, use_container_width=True)
             st.download_button(
@@ -814,9 +904,11 @@ with tab_dist:
 
             # Asset-level risk table (historical, horizon-matched).
             asset_risk_rows = []
-            for asset in asset_returns.columns:
+            for asset in diagnostic_asset_returns.columns:
                 a_series = _horizon_returns_cached(
-                    asset_returns[asset].dropna(), h, "simple"
+                    diagnostic_asset_returns[asset].dropna(),
+                    h,
+                    diagnostic_return_method,
                 )
                 a_var = calculate_var(a_series, "historical", confidence_level)
                 a_cvar = calculate_cvar(a_series, "historical", confidence_level)
@@ -944,26 +1036,38 @@ with tab_data:
         mime="text/csv",
     )
 
-    st.markdown("**Asset returns**")
+    st.markdown("**Core asset returns (Simple)**")
     st.dataframe(asset_returns.tail(10), use_container_width=True)
     st.download_button(
-        "⬇️ Download asset_returns.csv",
+        "⬇️ Download core_asset_returns_simple.csv",
         data=_df_to_csv_bytes(asset_returns),
-        file_name="asset_returns.csv",
+        file_name="core_asset_returns_simple.csv",
         mime="text/csv",
     )
 
-    st.markdown("**Portfolio returns & value**")
+    st.markdown("**Core portfolio returns & value (Simple)**")
     pv_df = pd.DataFrame(
         {"portfolio_return": portfolio_returns, "portfolio_value": portfolio_value}
     )
     st.dataframe(pv_df.tail(10), use_container_width=True)
     st.download_button(
-        "⬇️ Download portfolio_returns.csv",
+        "⬇️ Download core_portfolio_returns_simple.csv",
         data=_df_to_csv_bytes(pv_df),
-        file_name="portfolio_returns.csv",
+        file_name="core_portfolio_returns_simple.csv",
         mime="text/csv",
     )
+
+    if diagnostic_return_method == "log":
+        st.markdown("**Advanced diagnostic returns (Log)**")
+        diagnostic_df = diagnostic_asset_returns.copy()
+        diagnostic_df["PORTFOLIO"] = diagnostic_portfolio_returns
+        st.dataframe(diagnostic_df.tail(10), use_container_width=True)
+        st.download_button(
+            "⬇️ Download diagnostic_returns_log.csv",
+            data=_df_to_csv_bytes(diagnostic_df),
+            file_name="diagnostic_returns_log.csv",
+            mime="text/csv",
+        )
 
 
 # ─── Tab: Correlation & Diversification ───────────────────────────────────
@@ -972,7 +1076,8 @@ with tab_corr:
     st.header("🧩 Correlation & Diversification")
     st.caption(
         "Pearson / Spearman correlations and how the average pairwise "
-        "correlation evolves over time (diversification decay)."
+        "correlation evolves over time (diversification decay). This tab "
+        "uses the core simple-return series."
     )
 
     if asset_returns.shape[1] < 2:
@@ -2038,6 +2143,7 @@ with tab_mc:
                 distribution=paths_distribution,
                 df=float(mc_df),
                 random_seed=int(mc_seed),
+                return_method="simple",
             )
 
             comparison_all = compare_all_risk_methods(
@@ -2049,6 +2155,7 @@ with tab_mc:
                 n_scenarios=int(mc_n_scenarios),
                 student_t_df=float(mc_df),
                 random_seed=int(mc_seed),
+                return_method="simple",
             )
         except (ValueError, RuntimeError) as exc:
             st.error(f"Monte Carlo failed: {exc}")

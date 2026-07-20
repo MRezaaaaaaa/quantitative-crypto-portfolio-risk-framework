@@ -86,6 +86,11 @@ CVaR use the same signed loss-space contract. The current user-facing CVaR-cap
 input is intentionally restricted to a positive loss budget; that input policy
 does not change the signed representation of reported risk metrics.
 
+Optimization scenarios are required to be Simple returns. The same requirement
+applies to Monte Carlo wealth paths and arithmetic scenario aggregation. Log
+returns remain available only for advanced distribution diagnostics; see the
+[return-convention contract](return-conventions.md).
+
 ## Public conversion helpers
 
 The authoritative conversions are implemented in

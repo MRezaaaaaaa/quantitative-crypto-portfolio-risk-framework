@@ -83,6 +83,7 @@ input file hash
 configuration hashes
 asset universe and weights
 return convention
+return handling mode and diagnostic convention
 horizon and confidence level
 scenario source and count
 random seed

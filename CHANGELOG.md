@@ -8,6 +8,11 @@ Versioning when it reaches a public release.
 
 ### Added
 
+- Centralized Automatic/Advanced return-policy resolver and explicit
+  Simple-return API guards for scenario, path, and optimization boundaries.
+- Exact portfolio Log-return aggregation for advanced diagnostics, with tests
+  preventing weighted-Log approximations.
+- Public Simple/Log return-convention and calculation-boundary documentation.
 - Canonical signed-loss conversion helpers and contract tests for VaR, CVaR,
   return thresholds, and monetary values.
 - Public documentation for VaR/CVaR sign, unit, horizon, backtesting, and
@@ -29,6 +34,10 @@ Versioning when it reaches a public release.
 
 ### Changed
 
+- Replaced the global Streamlit Simple/Log switch with Automatic handling and
+  an Advanced diagnostic-only convention selector. Core portfolio, NAV,
+  backtesting, Monte Carlo, and optimization workflows now always use Simple
+  returns.
 - Standardized analytical, scenario, optimization, reporting, plotting, and UI
   descriptions on signed loss space without changing the underlying risk
   formulas.

@@ -352,6 +352,17 @@ def test_build_optimization_scenarios_bad_source(asset_returns_500):
         build_optimization_scenarios(asset_returns_500, source="bogus")
 
 
+def test_build_optimization_scenarios_rejects_log_returns(asset_returns_500):
+    from var_cvar_crypto_risk.optimization import build_optimization_scenarios
+
+    with pytest.raises(ValueError, match="simple-return"):
+        build_optimization_scenarios(
+            asset_returns_500,
+            source="historical",
+            return_method="log",
+        )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Format weights table
 # ─────────────────────────────────────────────────────────────────────────────

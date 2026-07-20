@@ -434,6 +434,7 @@ def build_optimization_scenarios(
     random_seed: int | None = 42,
     mean_vector: pd.Series | None = None,
     covariance_matrix: pd.DataFrame | None = None,
+    return_method: str = "simple",
 ) -> pd.DataFrame:
     """Build a scenario matrix for optimization.
 
@@ -456,6 +457,9 @@ def build_optimization_scenarios(
         (e.g. robust or shrinkage estimates from the assumptions engine).
         When omitted, sample estimates from ``asset_returns`` are used.
         Ignored for the historical source.
+    return_method : {"simple"}
+        Optimization scenarios must be expressed as simple returns. Log
+        returns must be converted before calling this function.
 
     Returns
     -------
@@ -466,6 +470,11 @@ def build_optimization_scenarios(
         raise ValueError("asset_returns must be a pandas DataFrame.")
     if asset_returns.empty:
         raise ValueError("asset_returns is empty.")
+    if return_method != "simple":
+        raise ValueError(
+            "build_optimization_scenarios requires simple-return inputs; "
+            "convert log returns before calling."
+        )
     src = source.lower()
 
     if src == "historical":

@@ -203,6 +203,17 @@ def test_calculate_portfolio_scenario_returns_weighted_sum():
     )
 
 
+def test_portfolio_scenario_aggregation_rejects_log_returns():
+    scenarios = pd.DataFrame({"A": [0.01], "B": [-0.02]})
+    weights = pd.Series({"A": 0.5, "B": 0.5})
+    with pytest.raises(ValueError, match="simple-return"):
+        calculate_portfolio_scenario_returns(
+            scenarios,
+            weights,
+            return_method="log",
+        )
+
+
 # ── scenario_var / scenario_cvar ────────────────────────────────────────────
 
 
@@ -307,6 +318,12 @@ def test_simulate_portfolio_paths_rejects_invalid_inputs():
             portfolio_daily_volatility=0.01,
             distribution="bogus",
         )
+    with pytest.raises(ValueError, match="simple-return"):
+        simulate_portfolio_paths(
+            portfolio_daily_mean=0.0,
+            portfolio_daily_volatility=0.01,
+            return_method="log",
+        )
 
 
 # ── compare_monte_carlo_distributions ───────────────────────────────────────
@@ -370,6 +387,18 @@ def test_compare_all_risk_methods_horizon_in_output(
     )
     assert "Horizon Days" in comparison.columns
     assert (comparison["Horizon Days"] == 7).all()
+
+
+def test_compare_all_risk_methods_rejects_log_inputs(
+    portfolio_returns_simple, asset_returns_3a, weights_3a
+):
+    with pytest.raises(ValueError, match="simple-return"):
+        compare_all_risk_methods(
+            portfolio_returns=portfolio_returns_simple,
+            asset_returns=asset_returns_3a,
+            weights=weights_3a,
+            return_method="log",
+        )
 
 
 # ── import isolation ────────────────────────────────────────────────────────

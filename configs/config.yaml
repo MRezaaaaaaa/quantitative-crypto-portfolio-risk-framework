@@ -13,6 +13,8 @@ data:
   cache_dir: "data/cache"
 
 returns:
+  # CLI diagnostic export convention only. Core portfolio, NAV, risk,
+  # scenario, backtesting, and optimization calculations always use simple.
   method: "simple"              # "simple" | "log"
   drop_na: true
 

@@ -8,6 +8,7 @@ import pytest
 
 from var_cvar_crypto_risk.portfolio import (
     calculate_portfolio_returns,
+    calculate_portfolio_value,
     normalize_weights,
     validate_weights,
 )
@@ -57,3 +58,48 @@ def test_portfolio_returns_index_matches_input(
 ) -> None:
     portfolio = calculate_portfolio_returns(sample_returns, sample_weights)
     pd.testing.assert_index_equal(portfolio.index, sample_returns.index)
+
+
+def test_log_portfolio_return_is_built_from_simple_asset_gross_returns() -> None:
+    simple = pd.DataFrame(
+        {"A": [0.10, -0.05], "B": [0.00, 0.02]},
+        index=pd.date_range("2024-01-01", periods=2, freq="D"),
+    )
+    log_returns = np.log1p(simple)
+    weights = pd.Series({"A": 0.6, "B": 0.4})
+    result = calculate_portfolio_returns(
+        log_returns,
+        weights,
+        return_method="log",
+    )
+    expected_simple = simple @ weights
+    expected_log = np.log1p(expected_simple)
+    np.testing.assert_allclose(result, expected_log, rtol=1e-12)
+
+
+def test_portfolio_value_supports_log_returns_without_simple_approximation() -> None:
+    simple = pd.Series(
+        [0.10, -0.05, 0.02],
+        index=pd.date_range("2024-01-01", periods=3, freq="D"),
+    )
+    expected = calculate_portfolio_value(simple, 100_000.0, return_method="simple")
+    actual = calculate_portfolio_value(
+        np.log1p(simple),
+        100_000.0,
+        return_method="log",
+    )
+    pd.testing.assert_series_equal(actual, expected)
+
+
+@pytest.mark.parametrize("method", ["arithmetic", "", "LOG"])
+def test_portfolio_functions_reject_unknown_return_method(method: str) -> None:
+    returns = pd.DataFrame({"A": [0.01], "B": [0.02]})
+    weights = pd.Series({"A": 0.5, "B": 0.5})
+    with pytest.raises(ValueError, match="return_method"):
+        calculate_portfolio_returns(returns, weights, return_method=method)
+    with pytest.raises(ValueError, match="return_method"):
+        calculate_portfolio_value(
+            pd.Series([0.01]),
+            100_000.0,
+            return_method=method,
+        )

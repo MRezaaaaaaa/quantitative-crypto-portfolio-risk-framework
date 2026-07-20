@@ -88,6 +88,9 @@ from var_cvar_crypto_risk.portfolio import (  # noqa: E402
     normalize_weights,
     validate_weights,
 )
+from var_cvar_crypto_risk.return_conventions import (  # noqa: E402
+    resolve_return_policy,
+)
 from var_cvar_crypto_risk.returns import calculate_returns  # noqa: E402
 from var_cvar_crypto_risk.risk_metrics import (  # noqa: E402
     calculate_max_drawdown,
@@ -146,7 +149,7 @@ def _backtesting_settings(config: dict) -> dict:
         ),
         "window": int(bt.get("default_window", 252)),
         "horizon_days": max(1, horizon),
-        "return_method": str(config.get("returns", {}).get("method", "simple")),
+        "return_method": "simple",
         "traffic_light_mode": str(bt.get("traffic_light_mode", "auto")),
         "methods": list(
             bt.get("methods", ["historical", "gaussian", "cornish_fisher"])
@@ -187,8 +190,12 @@ def _run_core_risk(config: dict, output_dir: str) -> tuple[
     """Compute prices/returns/risk metrics and save Phase 1 artifacts."""
     prices = load_price_data(config)
 
-    returns_method = config["returns"]["method"]
-    asset_returns = calculate_returns(prices, method=returns_method)
+    configured_diagnostic_method = config["returns"]["method"]
+    return_policy = resolve_return_policy(
+        "advanced",
+        diagnostic_method=configured_diagnostic_method,
+    )
+    asset_returns = calculate_returns(prices, method=return_policy.portfolio_method)
 
     weights = get_weights_from_config(config)
     if config["portfolio"]["normalize_weights"]:
@@ -200,10 +207,15 @@ def _run_core_risk(config: dict, output_dir: str) -> tuple[
         allow_short_selling=config["portfolio"]["allow_short_selling"],
     )
 
-    portfolio_returns = calculate_portfolio_returns(asset_returns, weights)
+    portfolio_returns = calculate_portfolio_returns(
+        asset_returns,
+        weights,
+        return_method=return_policy.portfolio_method,
+    )
     portfolio_value = calculate_portfolio_value(
         portfolio_returns,
         initial_capital=float(config["portfolio"]["initial_capital"]),
+        return_method=return_policy.wealth_method,
     )
 
     risk_summary = generate_risk_summary(
@@ -212,7 +224,7 @@ def _run_core_risk(config: dict, output_dir: str) -> tuple[
         initial_capital=float(config["portfolio"]["initial_capital"]),
         var_methods=config["risk"]["var_methods"],
         cvar_methods=config["risk"]["cvar_methods"],
-        return_method=returns_method,
+        return_method=return_policy.portfolio_method,
     )
 
     saved: list[str] = []
@@ -231,6 +243,23 @@ def _run_core_risk(config: dict, output_dir: str) -> tuple[
         ]:
             save_series(payload, path)
             saved.append(path)
+
+        if return_policy.diagnostic_method == "log":
+            diagnostic_asset_returns = calculate_returns(prices, method="log")
+            diagnostic_portfolio_returns = calculate_portfolio_returns(
+                diagnostic_asset_returns,
+                weights,
+                return_method="log",
+            )
+            diagnostic_asset_path = (
+                f"{output_dir}/tables/asset_returns_log_diagnostics.csv"
+            )
+            diagnostic_portfolio_path = (
+                f"{output_dir}/tables/portfolio_returns_log_diagnostics.csv"
+            )
+            save_dataframe(diagnostic_asset_returns, diagnostic_asset_path)
+            save_series(diagnostic_portfolio_returns, diagnostic_portfolio_path)
+            saved.extend([diagnostic_asset_path, diagnostic_portfolio_path])
 
     if config["outputs"].get("save_charts", True):
         confidence = float(config["risk"]["confidence_level"])
@@ -290,6 +319,11 @@ def _print_core_summary(
     print(f" Observations   : {len(portfolio_returns):,} trading days")
     print(f" Initial Capital: ${initial_capital:,.0f}")
     print(f" Confidence     : {confidence * 100:.1f}%")
+    print(" Core Returns   : Simple")
+    print(
+        f" Diagnostics    : "
+        f"{str(config['returns']['method']).title()}"
+    )
     print()
     print("──────────────────────────────────────────────────")
     print(" RISK METRICS")
@@ -489,6 +523,7 @@ def _run_monte_carlo(
         n_scenarios=n_scenarios,
         student_t_df=df,
         random_seed=seed,
+        return_method="simple",
     )
 
     # Portfolio paths use the historical portfolio daily mean/std as inputs.
@@ -503,6 +538,7 @@ def _run_monte_carlo(
         distribution=settings["default_distribution"],
         df=df,
         random_seed=seed,
+        return_method="simple",
     )
 
     # ── Save tables ──────────────────────────────────────────────────────

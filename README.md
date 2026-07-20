@@ -26,6 +26,9 @@ performance.
   expected-return assumptions.
 - Compares sample, EWMA, and linearly shrunk covariance estimates.
 - Exposes assumptions and diagnostics through an interactive Streamlit app.
+- Applies a centralized return policy: Simple for portfolio/NAV/scenario/
+  optimization calculations, with Log available only for advanced distribution
+  diagnostics.
 
 ## Important interpretation
 
@@ -151,6 +154,8 @@ over Gaussian or Historical VaR. Likewise, Student-t scenarios introduce
 heavier tails but do not eliminate parameter or regime uncertainty.
 
 See [Methodology and horizon conventions](docs/methodology.md).
+See [Return conventions and calculation boundaries](docs/return-conventions.md)
+for the exact Simple/Log routing policy.
 The exact sign and unit rules are defined in the
 [VaR and CVaR output contract](docs/risk-measure-contract.md).
 
@@ -178,9 +183,9 @@ Dependency declarations and the committed lockfile workflow are documented in
   or survivorship bias.
 - Multi-day square-root/time-linear scaling assumes independent and identically
   distributed returns.
-- Some scenario-path and optimization plumbing assumes simple-return
-  arithmetic; the app-level boundary for log-return inputs remains a pre-1.0
-  release blocker.
+- Scenario paths and optimization intentionally require simple-return
+  arithmetic. Log returns are limited to advanced distribution diagnostics and
+  are converted exactly when portfolio-level diagnostic returns are required.
 - Overlapping horizon observations reduce the effective sample size and are not
   appropriate for independence claims without qualification.
 - Expected-return estimates are noisy and can dominate optimized allocations.
@@ -200,8 +205,6 @@ Version `0.5.0` is a pre-1.0 research and development version. Work required
 before `v1.0.0` includes:
 
 - adding covariance-repair and solver-residual governance;
-- enforcing simple-versus-log return boundaries in scenario and optimization
-  workflows;
 - exercising the configured CI workflow on the future public GitHub remote;
 - adding security scanning and repository issue/PR templates;
 - raising coverage from the current 68% floor toward 80%;
@@ -213,6 +216,7 @@ See [CHANGELOG](CHANGELOG.md) and the specifications under `openspec/`.
 
 - [Architecture](docs/architecture.md)
 - [Methodology and horizons](docs/methodology.md)
+- [Return conventions](docs/return-conventions.md)
 - [VaR and CVaR output contract](docs/risk-measure-contract.md)
 - [Model risk](docs/model-risk.md)
 - [Data provenance](docs/data-provenance.md)

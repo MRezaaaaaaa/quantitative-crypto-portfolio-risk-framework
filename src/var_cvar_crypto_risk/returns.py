@@ -54,12 +54,18 @@ def calculate_returns(
 
 def calculate_cumulative_returns(
     returns: pd.Series | pd.DataFrame,
+    method: str = "simple",
 ) -> pd.Series | pd.DataFrame:
-    """Calculate cumulative returns from a returns series.
+    """Calculate cumulative returns under an explicit convention.
 
-    Uses the simple-returns convention: ``cumulative = (1 + r).cumprod() - 1``.
+    Simple returns compound as ``(1 + r).cumprod() - 1``. Log returns
+    compound as ``exp(g.cumsum()) - 1``.
     """
-    return (1.0 + returns).cumprod() - 1.0
+    if method == "simple":
+        return (1.0 + returns).cumprod() - 1.0
+    if method == "log":
+        return np.exp(returns.cumsum()) - 1.0
+    raise ValueError(f"Unknown method {method!r}. Use 'simple' or 'log'.")
 
 
 def calculate_horizon_returns(

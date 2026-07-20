@@ -12,6 +12,13 @@ For price (P_t):
 The return convention must accompany every stored or exported result. Simple
 and log returns are not interchangeable when aggregating wealth or horizons.
 
+The application uses Simple returns for portfolio construction, NAV,
+headline risk, backtesting, scenarios, Monte Carlo, robust-risk inputs, and
+optimization. Automatic mode uses Simple returns everywhere. Advanced mode can
+select Log returns for distribution diagnostics only. Portfolio diagnostic Log
+returns are derived exactly from reconstructed asset gross returns, not from a
+weighted average of asset Log returns. See [Return conventions](return-conventions.md).
+
 ## VaR and CVaR
 
 At confidence level `c`, the implementation evaluates the left tail at
@@ -93,6 +100,10 @@ The Student-t implementation rescales its dispersion so theoretical covariance
 matches the supplied covariance when degrees of freedom exceed two. A heavier
 tail is not evidence that the chosen degrees of freedom or dependence structure
 is correct.
+
+All scenario returns and simulated wealth-path innovations are represented as
+Simple returns. The public scenario and optimization boundaries reject a Log
+input declaration rather than applying incompatible arithmetic.
 
 ## Robust assumptions
 

@@ -35,3 +35,39 @@ def test_asset_table_init_does_not_overwrite_session_state() -> None:
     at.run()
     assert not at.exception
     assert list(at.session_state["assets_df"]["Symbol"]) == ["ZZZ"]
+
+
+def test_return_handling_defaults_to_automatic_and_exposes_advanced_log() -> None:
+    at = AppTest.from_file("app.py", default_timeout=60).run()
+    assert not at.exception
+
+    return_handling = next(
+        widget for widget in at.selectbox if widget.label == "Return handling"
+    )
+    assert return_handling.value == "automatic"
+    assert not any(
+        widget.label == "Diagnostic return convention"
+        for widget in at.selectbox
+    )
+
+    return_handling.set_value("advanced").run()
+    assert not at.exception
+    diagnostic = next(
+        widget
+        for widget in at.selectbox
+        if widget.label == "Diagnostic return convention"
+    )
+    diagnostic.set_value("log").run()
+    assert not at.exception
+    assert diagnostic.value == "log"
+
+
+def test_legacy_return_state_is_invalidated() -> None:
+    at = AppTest.from_file("app.py", default_timeout=60).run()
+    assert not at.exception
+    at.session_state["risk_results"] = {"returns_method": "log"}
+
+    at.run()
+
+    assert not at.exception
+    assert at.session_state["risk_results"] is None

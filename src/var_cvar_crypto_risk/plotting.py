@@ -1090,6 +1090,7 @@ def plot_asset_return_distributions(
     asset_returns: pd.DataFrame,
     horizon_days: int = 1,
     confidence_level: float = 0.95,
+    return_method: str = "simple",
     output_path: str | None = None,
 ) -> plt.Figure:
     """Small-multiples return histograms per asset with historical VaR/CVaR."""
@@ -1113,7 +1114,7 @@ def plot_asset_return_distributions(
         series = asset_returns[asset].dropna()
         if horizon_days > 1:
             series = calculate_horizon_returns(
-                series, horizon_days=horizon_days, method="simple"
+                series, horizon_days=horizon_days, method=return_method
             )
         clean = series.to_numpy(dtype=float)
         ax.hist(clean, bins=40, color=_PRIMARY, edgecolor="white", alpha=0.85)

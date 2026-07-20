@@ -152,6 +152,7 @@ def _print_header(config: dict, settings: dict, asset_returns: pd.DataFrame) -> 
         f"Horizon: {settings['horizon_days']}d"
     )
     print(f" Assets          : {', '.join(asset_returns.columns)}")
+    print(" Return Convention: Simple (required for scenario optimization)")
     print(
         f" Constraints     : long_only={settings['long_only']}   "
         f"min={settings['min_weight']}   max={settings['max_weight']}   "
@@ -197,8 +198,7 @@ def main() -> int:
 
     print("→ Loading prices and computing asset returns…")
     prices = load_price_data(config)
-    returns_method = config["returns"]["method"]
-    asset_returns = calculate_returns(prices, method=returns_method)
+    asset_returns = calculate_returns(prices, method="simple")
 
     current_weights = get_weights_from_config(config)
     if config["portfolio"]["normalize_weights"]:
@@ -225,6 +225,7 @@ def main() -> int:
         horizon_days=settings["horizon_days"],
         student_t_df=settings["student_t_df"],
         random_seed=settings["random_seed"],
+        return_method="simple",
     )
 
     # If we include cash, add it BEFORE optimization so it's also part of

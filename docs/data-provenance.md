@@ -21,7 +21,7 @@ Every published result should record:
 - asset identifiers and symbols;
 - number of raw and retained observations;
 - missing-data and alignment treatment;
-- simple or log-return convention;
+- core Simple-return convention plus any Advanced diagnostic Log convention;
 - data frequency and calendar;
 - configuration-file hash;
 - software version or Git commit;
