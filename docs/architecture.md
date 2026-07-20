@@ -40,6 +40,7 @@ returns.py and portfolio.py
 | `backtesting.py` | Rolling forecasts, breaches, coverage tests, and reports. |
 | `monte_carlo.py` | Parameter estimates, scenarios, paths, and scenario risk. |
 | `assumptions.py`, `views.py` | Robust optimizer inputs and manual return views. |
+| `covariance.py` | Covariance validation, numerical diagnostics, and deterministic repair. |
 | `optimization.py` | Scenario construction, CVaR programs, frontier analysis, and diagnostics. |
 | `correlation.py` | Dependence diagnostics. |
 | `plotting.py`, `export.py` | Presentation-neutral figures and generated files. |
@@ -93,3 +94,5 @@ and attach data provenance to each result.
    than silently applying Simple-return arithmetic.
 6. Methodology changes and architectural refactors must not share a commit.
 7. Generated data, caches, and reports must remain outside version control.
+8. Parametric simulation must pass covariance governance, and optimizer success
+   must pass independent residual validation before presentation as solved.

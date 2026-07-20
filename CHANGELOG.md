@@ -8,6 +8,13 @@ Versioning when it reaches a public release.
 
 ### Added
 
+- Covariance symmetry, eigenvalue, conditioning, and positive-definiteness
+  diagnostics with deterministic correlation-space repair before parametric
+  simulation.
+- Independent optimizer residual validation for budget, bounds, target return,
+  CVaR caps, and Rockafellar-Uryasev auxiliary constraints.
+- Streamlit and command-line diagnostics separating raw solver status from the
+  accepted public optimization status.
 - Centralized Automatic/Advanced return-policy resolver and explicit
   Simple-return API guards for scenario, path, and optimization boundaries.
 - Exact portfolio Log-return aggregation for advanced diagnostics, with tests

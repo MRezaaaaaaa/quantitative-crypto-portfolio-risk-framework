@@ -105,6 +105,13 @@ All scenario returns and simulated wealth-path innovations are represented as
 Simple returns. The public scenario and optimization boundaries reject a Log
 input declaration rather than applying incompatible arithmetic.
 
+Before Normal or Student-t simulation, the covariance input is checked for
+labels, finite values, symmetry, eigenvalues, and conditioning. The default
+policy repairs a numerically invalid matrix in correlation space while
+preserving marginal variances; strict mode rejects it. Repair stabilizes the
+linear algebra but does not validate the economic covariance assumption. See
+[Covariance and solver governance](covariance-and-solver-governance.md).
+
 ## Robust assumptions
 
 Expected-return choices include mean, median, trimmed mean, winsorized mean,
@@ -121,6 +128,12 @@ The optimizer uses scenario returns `R` and weights `w`, with loss `-R @ w`.
 The Rockafellar-Uryasev auxiliary-variable formulation minimizes empirical CVaR
 subject to the selected budget, box, cash, target-return, or CVaR-cap
 constraints.
+
+Solver success is provisional. Returned weights and available auxiliary
+variables are independently checked against the budget, box, target-return,
+CVaR-cap, and Rockafellar-Uryasev constraints. A result that exceeds the
+configured tolerance is labeled `validation_failed` even if the raw solver
+status was successful.
 
 The same scenarios are generally used to estimate inputs and evaluate the
 result. Metrics are therefore in-sample estimates. Portfolio weights should not

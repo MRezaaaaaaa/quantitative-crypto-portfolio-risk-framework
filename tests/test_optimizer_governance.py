@@ -26,6 +26,7 @@ from var_cvar_crypto_risk.optimization import (  # noqa: E402
     maximize_sharpe_ratio,
     minimize_cvar,
     minimize_cvar_for_target_return,
+    validate_solution_residuals,
 )
 
 cvxpy = pytest.importorskip("cvxpy")
@@ -56,6 +57,84 @@ def asset_returns() -> pd.DataFrame:
     R = mean + rng.standard_normal(size=(n, 3)) @ L.T
     idx = pd.date_range("2023-01-01", periods=n, freq="D")
     return pd.DataFrame(R, index=idx, columns=["BTC", "ETH", "SOL"])
+
+
+# ── Post-solve residual validation ──────────────────────────────────────
+
+
+def test_solution_residuals_pass_for_feasible_weights(scenarios):
+    weights = pd.Series({"BTC": 0.4, "ETH": 0.3, "SOL": 0.3})
+    report = validate_solution_residuals(
+        scenarios,
+        weights,
+        long_only=True,
+        min_weight=0.0,
+        max_weight=0.8,
+    )
+    assert report["passed"] is True
+    assert report["max_constraint_violation"] <= report["tolerance"]
+
+
+def test_solution_residuals_detect_budget_and_bound_violations(scenarios):
+    weights = pd.Series({"BTC": 0.8, "ETH": 0.4, "SOL": -0.1})
+    report = validate_solution_residuals(
+        scenarios,
+        weights,
+        long_only=True,
+        max_weight=0.7,
+    )
+    assert report["passed"] is False
+    assert report["budget_residual"] == pytest.approx(0.1)
+    assert report["lower_bound_violation"] == pytest.approx(0.1)
+    assert report["upper_bound_violation"] == pytest.approx(0.1)
+
+
+def test_solution_residuals_detect_target_and_cvar_violations(scenarios):
+    weights = pd.Series({"BTC": 0.4, "ETH": 0.3, "SOL": 0.3})
+    mu = scenarios.mean()
+    realized_expected = float(mu @ weights)
+    report = validate_solution_residuals(
+        scenarios,
+        weights,
+        expected_returns=mu,
+        target_return=realized_expected + 0.01,
+        cvar_limit=0.01,
+        solver_cvar=0.02,
+    )
+    assert report["passed"] is False
+    assert report["target_return_violation"] == pytest.approx(0.01)
+    assert report["cvar_limit_violation"] == pytest.approx(0.01)
+
+
+def test_solution_residuals_reject_nonfinite_auxiliary_solution(scenarios):
+    weights = pd.Series({"BTC": 0.4, "ETH": 0.3, "SOL": 0.3})
+    report = validate_solution_residuals(
+        scenarios,
+        weights,
+        var_threshold=float("nan"),
+        excess_losses=np.zeros(len(scenarios)),
+    )
+    assert report["passed"] is False
+    assert np.isinf(report["auxiliary_loss_violation"])
+
+
+@pytest.mark.parametrize(
+    "optimizer,kwargs",
+    [
+        (minimize_cvar, {}),
+        (maximize_return_with_cvar_constraint, {"cvar_limit": 0.50}),
+        (minimize_cvar_for_target_return, {"target_return": -0.50}),
+    ],
+)
+def test_solved_optimizers_publish_residual_governance(scenarios, optimizer, kwargs):
+    result = optimizer(scenarios, **kwargs)
+    assert result["solver_status"] in ("optimal", "optimal_inaccurate")
+    assert result["status"] in ("optimal", "optimal_inaccurate")
+    assert result["constraint_validation"]["passed"] is True
+    assert (
+        result["max_constraint_violation"]
+        <= result["constraint_validation"]["tolerance"]
+    )
 
 
 # ── Feasible bounds ──────────────────────────────────────────────────────
@@ -158,6 +237,9 @@ def test_max_sharpe_excludes_pure_cash_portfolio(scenarios):
 def test_max_sharpe_reports_skipped_candidates_key(scenarios):
     result = maximize_sharpe_ratio(scenarios)
     assert "n_skipped_low_vol" in result
+    if result["status"] in ("optimal", "optimal_inaccurate"):
+        assert result["solver_status"] in ("optimal", "optimal_inaccurate")
+        assert result["constraint_validation"]["passed"] is True
 
 
 # ── Result interpretation ────────────────────────────────────────────────
@@ -166,9 +248,7 @@ def test_max_sharpe_reports_skipped_candidates_key(scenarios):
 def test_interpret_binding_cvar_cap(scenarios):
     bounds = compute_feasible_risk_return_bounds(scenarios)
     tight_cap = bounds["min_cvar"] * 1.05  # feasible but binding
-    result = maximize_return_with_cvar_constraint(
-        scenarios, cvar_limit=tight_cap
-    )
+    result = maximize_return_with_cvar_constraint(scenarios, cvar_limit=tight_cap)
     assert result["status"] in ("optimal", "optimal_inaccurate")
     interp = interpret_optimization_result(
         result,
@@ -195,9 +275,7 @@ def test_interpret_excluded_and_min_weight_assets(scenarios):
 
     # With a forced min weight nothing can be excluded.
     result_forced = minimize_cvar(scenarios, min_weight=0.10)
-    interp_forced = interpret_optimization_result(
-        result_forced, min_weight=0.10
-    )
+    interp_forced = interpret_optimization_result(result_forced, min_weight=0.10)
     assert interp_forced["excluded_assets"] == []
 
 

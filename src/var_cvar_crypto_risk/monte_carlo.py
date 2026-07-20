@@ -30,6 +30,7 @@ import math
 import numpy as np
 import pandas as pd
 
+from .covariance import prepare_covariance_matrix
 from .cvar_models import calculate_cvar
 from .risk_conventions import (
     loss_value_to_money,
@@ -81,9 +82,7 @@ def estimate_return_parameters(
     if returns.empty:
         raise ValueError("returns is empty.")
     if returns.shape[0] < 2:
-        raise ValueError(
-            f"Need at least 2 observations, got {returns.shape[0]}."
-        )
+        raise ValueError(f"Need at least 2 observations, got {returns.shape[0]}.")
     if not all(pd.api.types.is_numeric_dtype(returns[col]) for col in returns.columns):
         raise ValueError("All columns of returns must be numeric.")
     if returns.isna().all(axis=0).any():
@@ -92,9 +91,7 @@ def estimate_return_parameters(
 
     clean = returns.dropna()
     if len(clean) < 2:
-        raise ValueError(
-            "After dropping NaNs, fewer than 2 observations remain."
-        )
+        raise ValueError("After dropping NaNs, fewer than 2 observations remain.")
 
     mean_vector = clean.mean()
     cov = clean.cov()
@@ -126,21 +123,28 @@ def _validate_simulation_inputs(
     covariance_matrix: pd.DataFrame,
     n_scenarios: int,
     horizon_days: int,
-) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    covariance_policy: str,
+) -> tuple[np.ndarray, np.ndarray, list[str], dict]:
     """Validate shapes and return aligned numpy arrays + asset list."""
     if n_scenarios <= 0:
         raise ValueError(f"n_scenarios must be > 0, got {n_scenarios}.")
     if horizon_days < 1:
         raise ValueError(f"horizon_days must be >= 1, got {horizon_days}.")
+    if not isinstance(mean_vector, pd.Series) or mean_vector.empty:
+        raise ValueError("mean_vector must be a non-empty pandas Series.")
+    if not mean_vector.index.is_unique:
+        raise ValueError("mean_vector asset labels must be unique.")
+    if not np.isfinite(mean_vector.to_numpy(dtype=float)).all():
+        raise ValueError("mean_vector must contain only finite values.")
+    if not isinstance(covariance_matrix, pd.DataFrame):
+        raise ValueError("covariance_matrix must be a pandas DataFrame.")
 
     assets = list(mean_vector.index)
     cov_assets = list(covariance_matrix.index)
     if cov_assets != assets or list(covariance_matrix.columns) != assets:
         cov_aligned = covariance_matrix.reindex(index=assets, columns=assets)
         if cov_aligned.isna().any().any():
-            raise ValueError(
-                "covariance_matrix indices do not align with mean_vector."
-            )
+            raise ValueError("covariance_matrix indices do not align with mean_vector.")
         covariance_matrix = cov_aligned
 
     mu = mean_vector.to_numpy(dtype=float)
@@ -152,20 +156,28 @@ def _validate_simulation_inputs(
             f"mean_vector size {mu.size}."
         )
 
-    # Symmetrize defensively.
-    cov = 0.5 * (cov + cov.T)
-    return mu, cov, assets
+    prepared_covariance, governance = prepare_covariance_matrix(
+        covariance_matrix,
+        policy=covariance_policy,
+    )
+    if not governance["after"]["is_positive_definite"]:
+        raise ValueError(
+            "covariance_matrix remains singular after governance; remove or "
+            "model zero-variance assets separately before simulation."
+        )
+    cov = prepared_covariance.to_numpy(dtype=float)
+    return mu, cov, assets, governance
 
 
-def _safe_cholesky(cov: np.ndarray) -> np.ndarray:
-    """Cholesky factor of ``cov``, with diagonal jitter on failure."""
+def _safe_cholesky(cov: np.ndarray) -> tuple[np.ndarray, float]:
+    """Return a Cholesky factor and any numerical diagonal jitter used."""
     try:
-        return np.linalg.cholesky(cov)
+        return np.linalg.cholesky(cov), 0.0
     except np.linalg.LinAlgError:
-        jitter = 1e-10 * np.eye(cov.shape[0])
         for k in range(10):
             try:
-                return np.linalg.cholesky(cov + (10**k) * jitter)
+                applied = float((10**k) * 1e-10)
+                return np.linalg.cholesky(cov + applied * np.eye(cov.shape[0])), applied
             except np.linalg.LinAlgError:
                 continue
         raise
@@ -177,6 +189,7 @@ def simulate_normal_returns(
     n_scenarios: int = 5000,
     horizon_days: int = 1,
     random_seed: int | None = 42,
+    covariance_policy: str = "repair",
 ) -> pd.DataFrame:
     """Generate multivariate Normal return scenarios.
 
@@ -188,23 +201,33 @@ def simulate_normal_returns(
     pd.DataFrame
         Shape ``n_scenarios × n_assets``. Index = ``scenario_i`` strings.
     """
-    mu, cov, assets = _validate_simulation_inputs(
-        mean_vector, covariance_matrix, n_scenarios, horizon_days
+    mu, cov, assets, covariance_governance = _validate_simulation_inputs(
+        mean_vector,
+        covariance_matrix,
+        n_scenarios,
+        horizon_days,
+        covariance_policy,
     )
 
     mu_h = mu * float(horizon_days)
     cov_h = cov * float(horizon_days)
 
     rng = np.random.default_rng(random_seed)
-    L = _safe_cholesky(cov_h)
+    L, cholesky_jitter = _safe_cholesky(cov_h)
     z = rng.standard_normal(size=(int(n_scenarios), mu.size))
     samples = mu_h + z @ L.T
 
-    return pd.DataFrame(
+    scenarios = pd.DataFrame(
         samples,
         columns=assets,
         index=[f"scenario_{i + 1}" for i in range(int(n_scenarios))],
     )
+    covariance_governance = {
+        **covariance_governance,
+        "cholesky_jitter": cholesky_jitter,
+    }
+    scenarios.attrs["covariance_governance"] = covariance_governance
+    return scenarios
 
 
 def simulate_student_t_returns(
@@ -214,6 +237,7 @@ def simulate_student_t_returns(
     n_scenarios: int = 5000,
     horizon_days: int = 1,
     random_seed: int | None = 42,
+    covariance_policy: str = "repair",
 ) -> pd.DataFrame:
     """Generate multivariate Student-t return scenarios with fat tails.
 
@@ -234,8 +258,12 @@ def simulate_student_t_returns(
     if df <= 2:
         raise ValueError(f"df must be > 2 for finite variance, got {df}.")
 
-    mu, cov, assets = _validate_simulation_inputs(
-        mean_vector, covariance_matrix, n_scenarios, horizon_days
+    mu, cov, assets, covariance_governance = _validate_simulation_inputs(
+        mean_vector,
+        covariance_matrix,
+        n_scenarios,
+        horizon_days,
+        covariance_policy,
     )
 
     mu_h = mu * float(horizon_days)
@@ -243,17 +271,23 @@ def simulate_student_t_returns(
     scale_cov = cov_h * (df - 2.0) / df  # so that resulting cov ≈ cov_h
 
     rng = np.random.default_rng(random_seed)
-    L = _safe_cholesky(scale_cov)
+    L, cholesky_jitter = _safe_cholesky(scale_cov)
     z = rng.standard_normal(size=(int(n_scenarios), mu.size))
     chi2 = rng.chisquare(df=df, size=int(n_scenarios)) / df
     inv_scale = 1.0 / np.sqrt(chi2)[:, None]
     samples = mu_h + inv_scale * (z @ L.T)
 
-    return pd.DataFrame(
+    scenarios = pd.DataFrame(
         samples,
         columns=assets,
         index=[f"scenario_{i + 1}" for i in range(int(n_scenarios))],
     )
+    covariance_governance = {
+        **covariance_governance,
+        "cholesky_jitter": cholesky_jitter,
+    }
+    scenarios.attrs["covariance_governance"] = covariance_governance
+    return scenarios
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -318,9 +352,7 @@ def scenario_var(
     if scenario_returns.empty:
         raise ValueError("scenario_returns is empty.")
     if not (0.0 < confidence_level < 1.0):
-        raise ValueError(
-            f"confidence_level must be in (0, 1), got {confidence_level}."
-        )
+        raise ValueError(f"confidence_level must be in (0, 1), got {confidence_level}.")
     alpha = 1.0 - float(confidence_level)
     threshold = float(np.quantile(scenario_returns.to_numpy(dtype=float), alpha))
     return return_threshold_to_loss_value(threshold)
@@ -336,9 +368,7 @@ def scenario_cvar(
     if scenario_returns.empty:
         raise ValueError("scenario_returns is empty.")
     if not (0.0 < confidence_level < 1.0):
-        raise ValueError(
-            f"confidence_level must be in (0, 1), got {confidence_level}."
-        )
+        raise ValueError(f"confidence_level must be in (0, 1), got {confidence_level}.")
     alpha = 1.0 - float(confidence_level)
     values = scenario_returns.to_numpy(dtype=float)
     threshold = float(np.quantile(values, alpha))
@@ -663,8 +693,12 @@ def compare_all_risk_methods(
     rows.append(
         {
             "Method": "Historical",
-            "VaR": _safe(lambda: calculate_var(agg_series, "historical", confidence_level)),
-            "CVaR": _safe(lambda: calculate_cvar(agg_series, "historical", confidence_level)),
+            "VaR": _safe(
+                lambda: calculate_var(agg_series, "historical", confidence_level)
+            ),
+            "CVaR": _safe(
+                lambda: calculate_cvar(agg_series, "historical", confidence_level)
+            ),
             "Confidence Level": float(confidence_level),
             "Horizon Days": h,
             "Notes": f"Empirical left-tail percentile{agg_note_suffix}.",
@@ -673,8 +707,12 @@ def compare_all_risk_methods(
     rows.append(
         {
             "Method": "Gaussian",
-            "VaR": _safe(lambda: calculate_var(agg_series, "gaussian", confidence_level)),
-            "CVaR": _safe(lambda: calculate_cvar(agg_series, "gaussian", confidence_level)),
+            "VaR": _safe(
+                lambda: calculate_var(agg_series, "gaussian", confidence_level)
+            ),
+            "CVaR": _safe(
+                lambda: calculate_cvar(agg_series, "gaussian", confidence_level)
+            ),
             "Confidence Level": float(confidence_level),
             "Horizon Days": h,
             "Notes": f"Parametric Normal{agg_note_suffix}.",

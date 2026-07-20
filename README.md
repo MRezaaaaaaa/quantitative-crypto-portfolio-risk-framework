@@ -25,6 +25,10 @@ performance.
 - Compares historical mean, median, trimmed, winsorized, shrinkage, and manual
   expected-return assumptions.
 - Compares sample, EWMA, and linearly shrunk covariance estimates.
+- Validates and, when required, deterministically repairs covariance inputs
+  before parametric simulation.
+- Independently validates optimizer budget, bound, return, CVaR, and auxiliary
+  constraint residuals instead of trusting solver status alone.
 - Exposes assumptions and diagnostics through an interactive Streamlit app.
 - Applies a centralized return policy: Simple for portfolio/NAV/scenario/
   optimization calculations, with Log available only for advanced distribution
@@ -146,6 +150,7 @@ technical debt.
 | Validation | Kupiec, Christoffersen independence and CC | `backtesting.py` |
 | Scenarios | Historical, multivariate Normal, multivariate Student-t | `monte_carlo.py` |
 | Assumptions | Robust location, volatility, and covariance estimates | `assumptions.py` |
+| Covariance governance | Symmetry/PSD diagnostics and deterministic repair | `covariance.py` |
 | Optimization | Minimum CVaR, CVaR cap, target return, frontier, Sharpe search | `optimization.py` |
 | Dependence | Static, rolling, weighted, stress-versus-normal correlation | `correlation.py` |
 
@@ -158,6 +163,8 @@ See [Return conventions and calculation boundaries](docs/return-conventions.md)
 for the exact Simple/Log routing policy.
 The exact sign and unit rules are defined in the
 [VaR and CVaR output contract](docs/risk-measure-contract.md).
+Numerical acceptance rules are defined in
+[Covariance and solver governance](docs/covariance-and-solver-governance.md).
 
 ## Reproducing results
 
@@ -193,8 +200,9 @@ Dependency declarations and the committed lockfile workflow are documented in
   strategies.
 - Transaction costs, market impact, liquidity, taxes, and execution constraints
   are not modeled.
-- Solver status alone does not prove economic feasibility; stronger residual
-  checks are planned before `v1.0.0`.
+- Solver success is accepted only after independent numerical residual checks;
+  passing those checks still does not prove economic optimality or future
+  feasibility.
 - No portfolio-monitoring or rebalancing engine is included in version 0.5.0.
 
 See [Model risk](docs/model-risk.md) for the complete interpretation framework.
@@ -204,7 +212,6 @@ See [Model risk](docs/model-risk.md) for the complete interpretation framework.
 Version `0.5.0` is a pre-1.0 research and development version. Work required
 before `v1.0.0` includes:
 
-- adding covariance-repair and solver-residual governance;
 - exercising the configured CI workflow on the future public GitHub remote;
 - adding security scanning and repository issue/PR templates;
 - raising coverage from the current 68% floor toward 80%;
@@ -218,6 +225,7 @@ See [CHANGELOG](CHANGELOG.md) and the specifications under `openspec/`.
 - [Methodology and horizons](docs/methodology.md)
 - [Return conventions](docs/return-conventions.md)
 - [VaR and CVaR output contract](docs/risk-measure-contract.md)
+- [Covariance and solver governance](docs/covariance-and-solver-governance.md)
 - [Model risk](docs/model-risk.md)
 - [Data provenance](docs/data-provenance.md)
 - [Reproducibility](docs/reproducibility.md)

@@ -48,6 +48,9 @@ from var_cvar_crypto_risk.correlation import (  # noqa: E402
     calculate_stress_vs_normal_correlation,
     calculate_weighted_average_correlation,
 )
+from var_cvar_crypto_risk.covariance import (  # noqa: E402
+    prepare_covariance_matrix,
+)
 from var_cvar_crypto_risk.cvar_models import calculate_cvar  # noqa: E402
 from var_cvar_crypto_risk.data_loader import validate_price_data  # noqa: E402
 from var_cvar_crypto_risk.monte_carlo import (  # noqa: E402
@@ -263,9 +266,7 @@ def _fetch_prices(
             except CoinGeckoError as exc:
                 if fallback == "yfinance":
                     frames.append(
-                        _fetch_yfinance_as_symbols(
-                            cg_records, start_date, end_date
-                        )
+                        _fetch_yfinance_as_symbols(cg_records, start_date, end_date)
                     )
                     used_source = "yfinance (fallback)"
                     warnings.append(
@@ -354,8 +355,9 @@ def _df_to_csv_bytes(df: pd.DataFrame, include_index: bool = True) -> bytes:
 
 def _fig_to_png_bytes(fig: plt.Figure) -> bytes:
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight",
-                facecolor=fig.get_facecolor())
+    fig.savefig(
+        buf, format="png", dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor()
+    )
     return buf.getvalue()
 
 
@@ -455,11 +457,15 @@ with st.sidebar:
     )
 
     selected_var_methods = st.multiselect(
-        "VaR methods", options=VAR_METHODS, default=VAR_METHODS,
+        "VaR methods",
+        options=VAR_METHODS,
+        default=VAR_METHODS,
         format_func=lambda m: METHOD_LABELS[m],
     )
     selected_cvar_methods = st.multiselect(
-        "CVaR methods", options=CVAR_METHODS, default=CVAR_METHODS,
+        "CVaR methods",
+        options=CVAR_METHODS,
+        default=CVAR_METHODS,
         format_func=lambda m: METHOD_LABELS[m],
     )
 
@@ -689,7 +695,7 @@ st.caption(
 
 obs = len(portfolio_returns)
 cum_return = float((1.0 + portfolio_returns).prod() - 1.0)
-ann_vol = float(portfolio_returns.std(ddof=1)) * (365 ** 0.5)
+ann_vol = float(portfolio_returns.std(ddof=1)) * (365**0.5)
 max_dd = calculate_max_drawdown(portfolio_returns)
 
 m1, m2, m3, m4 = st.columns(4)
@@ -917,9 +923,7 @@ with tab_dist:
                         "Asset": asset,
                         f"{horizon_label} VaR (%)": a_var * 100.0,
                         f"{horizon_label} CVaR (%)": a_cvar * 100.0,
-                        f"{horizon_label} Vol (%)": float(
-                            a_series.std(ddof=1)
-                        ) * 100.0,
+                        f"{horizon_label} Vol (%)": float(a_series.std(ddof=1)) * 100.0,
                     }
                 )
             st.markdown(
@@ -1108,9 +1112,7 @@ with tab_corr:
         met1, met2, met3 = st.columns(3)
         met1.metric("Avg pairwise correlation", f"{off_diag_mean:.3f}")
         try:
-            weighted_corr = calculate_weighted_average_correlation(
-                corr_matrix, weights
-            )
+            weighted_corr = calculate_weighted_average_correlation(corr_matrix, weights)
             met2.metric(
                 "Portfolio-weighted avg correlation",
                 f"{weighted_corr:.3f}",
@@ -1200,9 +1202,7 @@ with tab_corr:
             )
             plt.close(fig_rc)
         else:
-            st.info(
-                f"Not enough observations for a {corr_window}-day rolling window."
-            )
+            st.info(f"Not enough observations for a {corr_window}-day rolling window.")
 
 
 # ─── Tab: Robust Assumptions Engine (Phase 7) ─────────────────────────────
@@ -1447,7 +1447,11 @@ with tab_assumptions:
                 winsor_proportion=float(ra_winsor),
                 decay_lambda=float(ra_lambda),
             )
-            ra_cov = ra_config.covariance(asset_returns)
+            ra_cov_raw = ra_config.covariance(asset_returns)
+            ra_cov, ra_cov_governance = prepare_covariance_matrix(
+                ra_cov_raw,
+                policy="repair",
+            )
         except (ValueError, RuntimeError) as exc:
             st.error(f"Assumption build failed: {exc}")
             st.session_state["assumptions_results"] = None
@@ -1457,6 +1461,8 @@ with tab_assumptions:
                 "table": ra_table,
                 "vol_table": ra_vol_table,
                 "covariance": ra_cov,
+                "covariance_raw": ra_cov_raw,
+                "covariance_governance": ra_cov_governance,
                 "source": ra_source,
                 "horizon_days": int(ra_horizon),
                 "n_scenarios": int(ra_scenarios.shape[0]),
@@ -1546,6 +1552,45 @@ with tab_assumptions:
 
         st.markdown(f"### Covariance ({ra_cfg.covariance_method}, daily)")
         cov_used: pd.DataFrame = ra_state["covariance"]
+        cov_governance = ra_state.get("covariance_governance", {})
+        if cov_governance:
+            cov_before = cov_governance["before"]
+            cov_after = cov_governance["after"]
+            cov_status = (
+                "Repaired before use"
+                if cov_governance["repaired"]
+                else "Valid — no repair needed"
+            )
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Covariance status", cov_status)
+            c2.metric(
+                "Min eigenvalue (before)",
+                f"{cov_before['min_eigenvalue']:.3e}",
+            )
+            c3.metric(
+                "Min eigenvalue (used)",
+                f"{cov_after['min_eigenvalue']:.3e}",
+            )
+            condition = cov_after["condition_number"]
+            c4.metric(
+                "Condition number",
+                f"{condition:.3e}" if np.isfinite(condition) else "∞",
+            )
+            if cov_governance["repaired"]:
+                st.warning(
+                    "The estimated covariance was not numerically positive "
+                    "definite and was repaired before simulation or "
+                    "optimization. Marginal variances were preserved. This "
+                    "is numerical stabilization, not evidence that the "
+                    "covariance estimate is economically correct."
+                )
+            else:
+                st.caption(
+                    "The covariance passed symmetry and positive-definiteness "
+                    "checks without adjustment."
+                )
+            with st.expander("Covariance governance details", expanded=False):
+                st.json(cov_governance)
         cov_sd = np.sqrt(pd.Series(np.diag(cov_used), index=cov_used.index))
         implied_corr = cov_used / np.outer(cov_sd, cov_sd)
         cov_col1, cov_col2 = st.columns(2)
@@ -1678,11 +1723,17 @@ with tab_backtest:
             min_dt = portfolio_returns.index.min().date()
             max_dt = portfolio_returns.index.max().date()
             bt_start = st.date_input(
-                "From", value=min_dt, min_value=min_dt, max_value=max_dt,
+                "From",
+                value=min_dt,
+                min_value=min_dt,
+                max_value=max_dt,
                 key="bt_start",
             )
             bt_end = st.date_input(
-                "To", value=max_dt, min_value=min_dt, max_value=max_dt,
+                "To",
+                value=max_dt,
+                min_value=min_dt,
+                max_value=max_dt,
                 key="bt_end",
             )
 
@@ -1890,11 +1941,7 @@ with tab_backtest:
         row2 = st.columns(4)
 
         def _fmt_p(value: float) -> str:
-            return (
-                f"{value:.4f}"
-                if value is not None and pd.notna(value)
-                else "N/A"
-            )
+            return f"{value:.4f}" if value is not None and pd.notna(value) else "N/A"
 
         row2[0].metric("Kupiec p-value", _fmt_p(result["kupiec_p_value"]))
         row2[1].metric(
@@ -2455,8 +2502,7 @@ with tab_opt:
         )
 
     opt_use_robust_cov = st.checkbox(
-        "Use robust covariance from the Assumptions engine for MC scenario "
-        "generation",
+        "Use robust covariance from the Assumptions engine for MC scenario generation",
         value=False,
         key="opt_use_robust_cov",
         disabled=(
@@ -2471,9 +2517,7 @@ with tab_opt:
         ),
     )
 
-    with st.expander(
-        "📖 Scenario source — how it shapes the result", expanded=False
-    ):
+    with st.expander("📖 Scenario source — how it shapes the result", expanded=False):
         st.markdown(
             """
 The scenario matrix **is** the optimizer's model of the world, so the
@@ -2626,10 +2670,13 @@ acting on a result.
             step=0.005,
             format="%.3f",
             key="opt_cvar_limit",
-            disabled=(opt_objective not in (
-                "max_return_cvar_cap",
-                "compare_all",
-            )),
+            disabled=(
+                opt_objective
+                not in (
+                    "max_return_cvar_cap",
+                    "compare_all",
+                )
+            ),
         )
     with opt_e3:
         opt_target_return = st.number_input(
@@ -2640,10 +2687,13 @@ acting on a result.
             step=0.0005,
             format="%.4f",
             key="opt_target_return",
-            disabled=(opt_objective not in (
-                "min_cvar_target_return",
-                "compare_all",
-            )),
+            disabled=(
+                opt_objective
+                not in (
+                    "min_cvar_target_return",
+                    "compare_all",
+                )
+            ),
         )
     with opt_e4:
         opt_n_frontier = st.number_input(
@@ -2653,16 +2703,17 @@ acting on a result.
             value=20,
             step=1,
             key="opt_n_frontier",
-            disabled=(opt_objective not in (
-                "efficient_frontier",
-                "compare_all",
-            )),
+            disabled=(
+                opt_objective
+                not in (
+                    "efficient_frontier",
+                    "compare_all",
+                )
+            ),
         )
 
     if opt_long_only and opt_min_weight < 0:
-        st.warning(
-            "Long-only is enabled — negative min_weight will be clipped to 0."
-        )
+        st.warning("Long-only is enabled — negative min_weight will be clipped to 0.")
     if opt_min_weight > 0:
         st.caption(
             f"ℹ️ Min weight {opt_min_weight:.2f} **forces diversification**: "
@@ -2673,9 +2724,7 @@ acting on a result.
             "minimum."
         )
 
-    with st.expander(
-        "📖 Which constraints apply to which objective?", expanded=False
-    ):
+    with st.expander("📖 Which constraints apply to which objective?", expanded=False):
         st.markdown(
             """
 | Constraint | Min CVaR | Max Return (CVaR cap) | Min CVaR (target return) | Max Sharpe | Frontier |
@@ -2701,9 +2750,7 @@ acting on a result.
 """
         )
 
-    with st.expander(
-        "📖 CVaR cap = your risk budget (regime shifts)", expanded=False
-    ):
+    with st.expander("📖 CVaR cap = your risk budget (regime shifts)", expanded=False):
         st.markdown(
             """
 The CVaR cap is a **hard risk budget**, and the optimal allocation can
@@ -2780,13 +2827,15 @@ sweep the cap ±2 % to see how stable the weights are.
             # Optional robust covariance override (MC sources only).
             opt_cov_override = None
             robust_cov_used = False
+            robust_cov_governance = None
             if opt_use_robust_cov and opt_source != "historical":
                 _ra_state = st.session_state.get("assumptions_results")
                 if _ra_state is not None:
-                    ra_cov = _ra_state["config"].covariance(asset_returns)
+                    ra_cov = _ra_state["covariance"]
                     if list(ra_cov.columns) == list(asset_returns.columns):
                         opt_cov_override = ra_cov
                         robust_cov_used = True
+                        robust_cov_governance = _ra_state.get("covariance_governance")
 
             scenarios = _scenario_matrix_cached(
                 asset_returns,
@@ -2796,6 +2845,9 @@ sweep the cap ±2 % to see how stable the weights are.
                 float(opt_student_df),
                 int(opt_seed),
                 covariance_matrix=opt_cov_override,
+            )
+            scenario_covariance_governance = scenarios.attrs.get(
+                "covariance_governance"
             )
             # Cash earns the risk-free rate when an rf mode is active,
             # otherwise the manual cash-return input is used.
@@ -3004,6 +3056,11 @@ sweep the cap ±2 % to see how stable the weights are.
                 "expected_returns": expected_returns_vec,
                 "estimator_label": estimator_label,
                 "robust_cov_used": robust_cov_used,
+                "covariance_governance": (
+                    robust_cov_governance
+                    if robust_cov_governance is not None
+                    else scenario_covariance_governance
+                ),
                 "risk_bounds": risk_bounds,
                 "interpretations": interpretations,
                 "diagnostics": diagnostics,
@@ -3055,9 +3112,7 @@ sweep the cap ±2 % to see how stable the weights are.
                 f"{opt_state['n_scenarios']:,} × {len(opt_state['assets'])}",
             )
             g3.metric("Horizon", f"{opt_state['horizon_days']} day(s)")
-            g4.metric(
-                "Confidence", f"{opt_state['confidence_level'] * 100:.1f}%"
-            )
+            g4.metric("Confidence", f"{opt_state['confidence_level'] * 100:.1f}%")
 
             mu_used = opt_state.get("expected_returns")
             if isinstance(mu_used, pd.Series):
@@ -3100,6 +3155,21 @@ sweep the cap ±2 % to see how stable the weights are.
                     "✅ MC scenarios were generated from the **robust "
                     "covariance** built in the Assumptions tab."
                 )
+            covariance_governance = opt_state.get("covariance_governance")
+            if covariance_governance:
+                cov_status = (
+                    "repaired"
+                    if covariance_governance.get("repaired")
+                    else "validated without repair"
+                )
+                cov_after = covariance_governance.get("after", {})
+                st.caption(
+                    "Covariance governance — "
+                    f"**{cov_status}** · minimum eigenvalue used: "
+                    f"`{cov_after.get('min_eigenvalue', float('nan')):.3e}` · "
+                    "full diagnostics are available in the Robust "
+                    "Assumptions tab."
+                )
             if opt_bounds:
                 b_min = opt_bounds.get("min_cvar", float("nan"))
                 b_max = opt_bounds.get("max_return", float("nan"))
@@ -3109,8 +3179,7 @@ sweep the cap ±2 % to see how stable the weights are.
                         f"minimum achievable CVaR: "
                         f"**{b_min * 100:.2f}%**"
                         + (
-                            f" · maximum achievable E[r]: "
-                            f"**{b_max * 100:.3f}%**"
+                            f" · maximum achievable E[r]: **{b_max * 100:.3f}%**"
                             if pd.notna(b_max)
                             else ""
                         )
@@ -3159,8 +3228,7 @@ sweep the cap ±2 % to see how stable the weights are.
                 f"{v_cvar * 100:.2f}%" if pd.notna(v_cvar) else "N/A",
             )
             st.caption(
-                f"KPI cards reflect: **{primary_label}** — "
-                f"{primary.get('message', '')}"
+                f"KPI cards reflect: **{primary_label}** — {primary.get('message', '')}"
             )
 
         # ── Weights tables + chart ────────────────────────────────────
@@ -3177,8 +3245,47 @@ sweep the cap ±2 % to see how stable the weights are.
                         else "❌"
                     )
                     st.markdown(f"**{label}** · {status_icon} `{status_str}`")
+                    solver_status = str(result.get("solver_status", "not_run"))
+                    validation = result.get("constraint_validation", {})
+                    validation_status = validation.get("status", "not_run")
+                    max_violation = result.get("max_constraint_violation", float("nan"))
+                    st.caption(
+                        f"Solver: `{solver_status}` · independent residual "
+                        f"check: `{validation_status}` · max violation: "
+                        + (
+                            f"`{max_violation:.3e}`"
+                            if pd.notna(max_violation)
+                            else "`N/A`"
+                        )
+                    )
+                    if validation:
+                        with st.expander(
+                            f"Constraint residuals — {label}", expanded=False
+                        ):
+                            residual_rows = [
+                                {
+                                    "Check": key,
+                                    "Violation": value,
+                                }
+                                for key, value in validation.items()
+                                if key.endswith("_violation")
+                                or key == "budget_residual"
+                            ]
+                            st.dataframe(
+                                pd.DataFrame(residual_rows),
+                                use_container_width=True,
+                                hide_index=True,
+                            )
+                            st.caption(
+                                "A result is accepted only when every "
+                                "reported violation is within tolerance "
+                                f"{validation.get('tolerance', float('nan')):.1e}."
+                            )
                     weights_series = result.get("weights")
-                    if isinstance(weights_series, pd.Series) and not weights_series.isna().all():
+                    if (
+                        isinstance(weights_series, pd.Series)
+                        and not weights_series.isna().all()
+                    ):
                         st.dataframe(
                             format_weights_table(weights_series),
                             use_container_width=True,
@@ -3210,9 +3317,11 @@ sweep the cap ±2 % to see how stable the weights are.
                                 st.markdown(f"- {note}")
 
             # Chart for the primary optimizer (Min CVaR if present).
-            if primary is not None and isinstance(
-                primary.get("weights"), pd.Series
-            ) and not primary["weights"].isna().all():
+            if (
+                primary is not None
+                and isinstance(primary.get("weights"), pd.Series)
+                and not primary["weights"].isna().all()
+            ):
                 fig_w = plot_optimized_weights(
                     primary["weights"],
                     title=f"{primary_label} — Optimized Weights",
@@ -3266,9 +3375,7 @@ sweep the cap ±2 % to see how stable the weights are.
             comp_display["Sharpe"] = comp_display["Sharpe"].apply(
                 lambda v: f"{v:.2f}" if pd.notna(v) else "N/A"
             )
-        st.dataframe(
-            comp_display, use_container_width=True, hide_index=True
-        )
+        st.dataframe(comp_display, use_container_width=True, hide_index=True)
         st.download_button(
             "⬇️ Download portfolio_comparison.csv",
             data=_df_to_csv_bytes(comparison_df, include_index=False),
@@ -3321,9 +3428,7 @@ sweep the cap ±2 % to see how stable the weights are.
             )
             plt.close(fig_f)
 
-            st.dataframe(
-                frontier_df, use_container_width=True, hide_index=True
-            )
+            st.dataframe(frontier_df, use_container_width=True, hide_index=True)
             st.download_button(
                 "⬇️ Download cvar_efficient_frontier.csv",
                 data=_df_to_csv_bytes(frontier_df, include_index=False),

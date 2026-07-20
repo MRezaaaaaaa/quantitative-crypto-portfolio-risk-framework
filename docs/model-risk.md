@@ -27,6 +27,11 @@ Sample covariance matrices are noisy; EWMA is more responsive but can overreact
 to a short regime; linear shrinkage is more stable but depends on the selected
 target and intensity. None is universally correct.
 
+A covariance repair can make an estimate numerically usable without making it
+economically credible. A material eigenvalue or symmetry adjustment is a model-
+risk signal, not a quality certificate. The adjustment and diagnostics must be
+retained with the result.
+
 ## Distribution and tail risk
 
 - VaR and CVaR use signed loss space. A negative value represents a tail gain,
@@ -74,6 +79,9 @@ identify economic regimes.
 - A high expected-return estimate can dominate a tail-risk objective unless
   explicitly constrained.
 - `optimal_inaccurate` is a numerical warning, not a clean economic optimum.
+- Raw solver success is rejected when independent constraint residuals exceed
+  tolerance. Passing residual checks establishes numerical consistency only;
+  it does not validate the objective, inputs, or out-of-sample portfolio.
 - Current results omit transaction costs, turnover, liquidity, capacity, taxes,
   custody risk, and execution slippage.
 - Current comparisons are not walk-forward portfolio backtests.

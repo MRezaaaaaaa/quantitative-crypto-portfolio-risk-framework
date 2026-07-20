@@ -89,7 +89,9 @@ scenario source and count
 random seed
 expected-return estimator
 covariance estimator and parameters
+covariance validation policy, repair flag, and adjustment diagnostics
 optimizer objective and constraints
+solver, raw solver status, residual tolerance, and maximum violation
 output file hashes
 ```
 

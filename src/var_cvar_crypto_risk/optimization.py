@@ -196,9 +196,7 @@ def validate_scenario_matrix(scenario_returns: pd.DataFrame) -> None:
     if scenario_returns.empty:
         raise ValueError("scenario_returns is empty.")
     if scenario_returns.shape[0] < 2:
-        raise ValueError(
-            f"Need at least 2 scenarios, got {scenario_returns.shape[0]}."
-        )
+        raise ValueError(f"Need at least 2 scenarios, got {scenario_returns.shape[0]}.")
     if scenario_returns.shape[1] < 1:
         raise ValueError("scenario_returns must contain at least one asset.")
     non_numeric = [
@@ -218,6 +216,148 @@ def validate_scenario_matrix(scenario_returns: pd.DataFrame) -> None:
         )
     if not np.isfinite(scenario_returns.to_numpy(dtype=float)).all():
         raise ValueError("scenario_returns contains non-finite values (inf/-inf).")
+
+
+def validate_solution_residuals(
+    scenario_returns: pd.DataFrame,
+    weights: pd.Series,
+    confidence_level: float = 0.95,
+    long_only: bool = True,
+    min_weight: float | None = None,
+    max_weight: float | None = 1.0,
+    expected_returns: pd.Series | None = None,
+    target_return: float | None = None,
+    cvar_limit: float | None = None,
+    solver_cvar: float | None = None,
+    var_threshold: float | None = None,
+    excess_losses: np.ndarray | None = None,
+    tolerance: float = 1e-5,
+) -> dict:
+    """Recompute primal feasibility residuals after an optimizer solve.
+
+    Solver status is only a numerical claim. This function independently
+    checks the budget, effective weight box, optional target return and CVaR
+    cap, plus the Rockafellar-Uryasev auxiliary constraints when their solved
+    values are supplied.
+    """
+    validate_scenario_matrix(scenario_returns)
+    if tolerance <= 0:
+        raise ValueError(f"tolerance must be > 0, got {tolerance}.")
+    if not (0.0 < confidence_level < 1.0):
+        raise ValueError(f"confidence_level must be in (0, 1), got {confidence_level}.")
+    if not isinstance(weights, pd.Series):
+        raise ValueError("weights must be a pandas Series.")
+    aligned = weights.reindex(scenario_returns.columns)
+    if aligned.isna().any():
+        missing = aligned[aligned.isna()].index.tolist()
+        raise ValueError(f"weights missing or non-finite for assets: {missing}")
+
+    w = aligned.to_numpy(dtype=float)
+    finite_weights = bool(np.isfinite(w).all())
+    budget_residual = abs(float(w.sum()) - 1.0) if finite_weights else float("inf")
+
+    effective_lower_bound: float | None
+    if long_only:
+        effective_lower_bound = max(
+            0.0,
+            float(min_weight) if min_weight is not None else 0.0,
+        )
+    else:
+        effective_lower_bound = float(min_weight) if min_weight is not None else None
+    lower_bound_violation = (
+        max(float(effective_lower_bound - np.min(w)), 0.0)
+        if finite_weights and effective_lower_bound is not None
+        else (0.0 if finite_weights else float("inf"))
+    )
+    upper_bound_violation = (
+        max(float(np.max(w) - float(max_weight)), 0.0)
+        if finite_weights and max_weight is not None
+        else (0.0 if finite_weights else float("inf"))
+    )
+
+    target_return_violation = 0.0
+    achieved_expected_return = float("nan")
+    if target_return is not None:
+        mu = (
+            scenario_returns.mean()
+            if expected_returns is None
+            else expected_returns.reindex(scenario_returns.columns)
+        )
+        if mu.isna().any() or not np.isfinite(mu.to_numpy(dtype=float)).all():
+            raise ValueError("expected_returns must be finite and cover every asset.")
+        achieved_expected_return = float(mu.to_numpy(dtype=float) @ w)
+        target_return_violation = max(
+            float(target_return) - achieved_expected_return,
+            0.0,
+        )
+
+    evaluated_cvar = float("nan")
+    cvar_limit_violation = 0.0
+    if cvar_limit is not None:
+        if solver_cvar is None:
+            portfolio_returns = pd.Series(scenario_returns.to_numpy(dtype=float) @ w)
+            evaluated_cvar = float(scenario_cvar(portfolio_returns, confidence_level))
+        else:
+            evaluated_cvar = float(solver_cvar)
+        cvar_limit_violation = (
+            max(evaluated_cvar - float(cvar_limit), 0.0)
+            if np.isfinite(evaluated_cvar)
+            else float("inf")
+        )
+
+    auxiliary_nonnegative_violation = 0.0
+    auxiliary_loss_violation = 0.0
+    if (var_threshold is None) != (excess_losses is None):
+        raise ValueError("var_threshold and excess_losses must be supplied together.")
+    if var_threshold is not None and excess_losses is not None:
+        u = np.asarray(excess_losses, dtype=float).reshape(-1)
+        if (
+            not np.isfinite(float(var_threshold))
+            or u.size != len(scenario_returns)
+            or not np.isfinite(u).all()
+        ):
+            auxiliary_nonnegative_violation = float("inf")
+            auxiliary_loss_violation = float("inf")
+        else:
+            losses = -(scenario_returns.to_numpy(dtype=float) @ w)
+            auxiliary_nonnegative_violation = max(float(-np.min(u)), 0.0)
+            auxiliary_loss_violation = max(
+                float(np.max(losses - float(var_threshold) - u)),
+                0.0,
+            )
+
+    residual_values = [
+        budget_residual,
+        lower_bound_violation,
+        upper_bound_violation,
+        target_return_violation,
+        cvar_limit_violation,
+        auxiliary_nonnegative_violation,
+        auxiliary_loss_violation,
+    ]
+    max_violation = float(max(residual_values))
+    passed = bool(finite_weights and max_violation <= float(tolerance))
+
+    return {
+        "passed": passed,
+        "status": "passed" if passed else "failed",
+        "tolerance": float(tolerance),
+        "finite_weights": finite_weights,
+        "budget_residual": budget_residual,
+        "effective_lower_bound": effective_lower_bound,
+        "effective_upper_bound": (
+            float(max_weight) if max_weight is not None else None
+        ),
+        "lower_bound_violation": lower_bound_violation,
+        "upper_bound_violation": upper_bound_violation,
+        "achieved_expected_return": achieved_expected_return,
+        "target_return_violation": target_return_violation,
+        "evaluated_cvar": evaluated_cvar,
+        "cvar_limit_violation": cvar_limit_violation,
+        "auxiliary_nonnegative_violation": auxiliary_nonnegative_violation,
+        "auxiliary_loss_violation": auxiliary_loss_violation,
+        "max_constraint_violation": max_violation,
+    }
 
 
 def add_cash_asset(
@@ -342,9 +482,7 @@ def calculate_portfolio_scenario_metrics(
     """
     validate_scenario_matrix(scenario_returns)
     if not (0.0 < confidence_level < 1.0):
-        raise ValueError(
-            f"confidence_level must be in (0, 1), got {confidence_level}."
-        )
+        raise ValueError(f"confidence_level must be in (0, 1), got {confidence_level}.")
     if not isinstance(weights, pd.Series):
         raise ValueError("weights must be a pd.Series.")
 
@@ -354,8 +492,7 @@ def calculate_portfolio_scenario_metrics(
         raise ValueError(f"weights missing for scenario columns: {missing}")
 
     portfolio = pd.Series(
-        scenario_returns.to_numpy(dtype=float)
-        @ aligned.to_numpy(dtype=float),
+        scenario_returns.to_numpy(dtype=float) @ aligned.to_numpy(dtype=float),
         index=scenario_returns.index,
         name="portfolio_scenario_return",
     )
@@ -413,8 +550,7 @@ def _aggregate_horizon_simple(returns: pd.DataFrame, horizon_days: int) -> pd.Da
     cleaned = returns.dropna()
     if len(cleaned) < horizon_days:
         raise ValueError(
-            f"Not enough observations ({len(cleaned)}) for horizon "
-            f"{horizon_days}."
+            f"Not enough observations ({len(cleaned)}) for horizon {horizon_days}."
         )
 
     rolling = (
@@ -435,6 +571,7 @@ def build_optimization_scenarios(
     mean_vector: pd.Series | None = None,
     covariance_matrix: pd.DataFrame | None = None,
     return_method: str = "simple",
+    covariance_policy: str = "repair",
 ) -> pd.DataFrame:
     """Build a scenario matrix for optimization.
 
@@ -460,6 +597,9 @@ def build_optimization_scenarios(
     return_method : {"simple"}
         Optimization scenarios must be expressed as simple returns. Log
         returns must be converted before calling this function.
+    covariance_policy : {"repair", "strict"}
+        Governance policy for Monte Carlo covariance inputs. Ignored for
+        historical scenarios.
 
     Returns
     -------
@@ -480,9 +620,7 @@ def build_optimization_scenarios(
     if src == "historical":
         scenarios = _aggregate_horizon_simple(asset_returns, int(horizon_days))
         scenarios = scenarios.reset_index(drop=True)
-        scenarios.index = pd.Index(
-            [f"hist_{i + 1}" for i in range(len(scenarios))]
-        )
+        scenarios.index = pd.Index([f"hist_{i + 1}" for i in range(len(scenarios))])
         scenarios.columns = asset_returns.columns
         return scenarios
 
@@ -501,6 +639,7 @@ def build_optimization_scenarios(
             n_scenarios=int(n_scenarios),
             horizon_days=int(horizon_days),
             random_seed=random_seed,
+            covariance_policy=covariance_policy,
         )
 
     if src == "student_t_mc":
@@ -511,6 +650,7 @@ def build_optimization_scenarios(
             n_scenarios=int(n_scenarios),
             horizon_days=int(horizon_days),
             random_seed=random_seed,
+            covariance_policy=covariance_policy,
         )
 
     raise ValueError(
@@ -533,16 +673,21 @@ def _empty_result(
 ) -> dict:
     base: dict = {
         "status": status,
+        "solver_status": status,
         "objective_value": float("nan"),
-        "weights": pd.Series(
-            [float("nan")] * len(assets), index=assets, name="weight"
-        ),
+        "weights": pd.Series([float("nan")] * len(assets), index=assets, name="weight"),
         "expected_return": float("nan"),
         "VaR": float("nan"),
         "CVaR": float("nan"),
         "volatility": float("nan"),
         "solver": solver,
         "message": message,
+        "constraint_validation": {
+            "passed": False,
+            "status": "not_run",
+            "max_constraint_violation": float("nan"),
+        },
+        "max_constraint_violation": float("nan"),
     }
     if extras:
         base.update(extras)
@@ -575,6 +720,57 @@ def _enrich_with_metrics(
     return result
 
 
+def _apply_solution_governance(
+    result: dict,
+    scenario_returns: pd.DataFrame,
+    weights: pd.Series,
+    confidence_level: float,
+    long_only: bool,
+    min_weight: float | None,
+    max_weight: float | None,
+    expected_returns: pd.Series | None = None,
+    target_return: float | None = None,
+    cvar_limit: float | None = None,
+    solver_cvar: float | None = None,
+    var_threshold: float | None = None,
+    excess_losses: np.ndarray | None = None,
+    tolerance: float = 1e-5,
+) -> dict:
+    """Attach independent residual checks and reject false solver success."""
+    solver_status = str(result.get("status", "unknown"))
+    validation = validate_solution_residuals(
+        scenario_returns,
+        weights,
+        confidence_level=confidence_level,
+        long_only=long_only,
+        min_weight=min_weight,
+        max_weight=max_weight,
+        expected_returns=expected_returns,
+        target_return=target_return,
+        cvar_limit=cvar_limit,
+        solver_cvar=solver_cvar,
+        var_threshold=var_threshold,
+        excess_losses=excess_losses,
+        tolerance=tolerance,
+    )
+    result["solver_status"] = solver_status
+    result["constraint_validation"] = validation
+    result["max_constraint_violation"] = validation["max_constraint_violation"]
+    if not validation["passed"]:
+        result["status"] = "validation_failed"
+        result["message"] = (
+            f"Solver reported {solver_status}, but independent constraint "
+            "validation failed: max violation "
+            f"{validation['max_constraint_violation']:.3e} exceeds tolerance "
+            f"{validation['tolerance']:.3e}."
+        )
+    else:
+        result["message"] = (
+            f"{_status_message(solver_status)} Independent residual validation passed."
+        )
+    return result
+
+
 def minimize_cvar(
     scenario_returns: pd.DataFrame,
     confidence_level: float = 0.95,
@@ -601,14 +797,10 @@ def minimize_cvar(
     """
     validate_scenario_matrix(scenario_returns)
     if not (0.0 < confidence_level < 1.0):
-        raise ValueError(
-            f"confidence_level must be in (0, 1), got {confidence_level}."
-        )
+        raise ValueError(f"confidence_level must be in (0, 1), got {confidence_level}.")
 
     if include_cash:
-        scenario_returns = add_cash_asset(
-            scenario_returns, cash_return=cash_return
-        )
+        scenario_returns = add_cash_asset(scenario_returns, cash_return=cash_return)
 
     assets = list(scenario_returns.columns)
     R = scenario_returns.to_numpy(dtype=float)
@@ -654,9 +846,19 @@ def minimize_cvar(
         index=assets,
         name="weight",
     )
+    t_value = float(t.value) if t.value is not None else float("nan")
+    u_values = (
+        np.asarray(u.value, dtype=float).reshape(-1)
+        if u.value is not None
+        else np.full(n_scenarios, float("nan"))
+    )
+    solver_cvar = t_value + (1.0 / ((1.0 - beta) * n_scenarios)) * float(
+        np.sum(u_values)
+    )
 
     result = {
         "status": status,
+        "solver_status": status,
         "objective_value": float(problem.value),
         "weights": weights,
         "expected_return": float("nan"),
@@ -669,6 +871,18 @@ def minimize_cvar(
     }
     result = _enrich_with_metrics(
         result, scenario_returns, weights, beta, initial_capital=None
+    )
+    result = _apply_solution_governance(
+        result,
+        scenario_returns,
+        weights,
+        confidence_level=beta,
+        long_only=long_only,
+        min_weight=min_weight,
+        max_weight=max_weight,
+        solver_cvar=solver_cvar,
+        var_threshold=t_value,
+        excess_losses=u_values,
     )
     return result
 
@@ -693,16 +907,12 @@ def maximize_return_with_cvar_constraint(
     """
     validate_scenario_matrix(scenario_returns)
     if not (0.0 < confidence_level < 1.0):
-        raise ValueError(
-            f"confidence_level must be in (0, 1), got {confidence_level}."
-        )
+        raise ValueError(f"confidence_level must be in (0, 1), got {confidence_level}.")
     if cvar_limit <= 0:
         raise ValueError(f"cvar_limit must be > 0, got {cvar_limit}.")
 
     if include_cash:
-        scenario_returns = add_cash_asset(
-            scenario_returns, cash_return=cash_return
-        )
+        scenario_returns = add_cash_asset(scenario_returns, cash_return=cash_return)
 
     if expected_returns is None:
         expected_returns = estimate_expected_returns(scenario_returns, "mean")
@@ -710,9 +920,7 @@ def maximize_return_with_cvar_constraint(
         expected_returns = expected_returns.reindex(scenario_returns.columns)
         if expected_returns.isna().any():
             missing = expected_returns[expected_returns.isna()].index.tolist()
-            raise ValueError(
-                f"expected_returns missing for columns: {missing}"
-            )
+            raise ValueError(f"expected_returns missing for columns: {missing}")
 
     assets = list(scenario_returns.columns)
     R = scenario_returns.to_numpy(dtype=float)
@@ -762,9 +970,19 @@ def maximize_return_with_cvar_constraint(
         index=assets,
         name="weight",
     )
+    t_value = float(t.value) if t.value is not None else float("nan")
+    u_values = (
+        np.asarray(u.value, dtype=float).reshape(-1)
+        if u.value is not None
+        else np.full(n_scenarios, float("nan"))
+    )
+    solver_cvar = t_value + (1.0 / ((1.0 - beta) * n_scenarios)) * float(
+        np.sum(u_values)
+    )
 
     result = {
         "status": status,
+        "solver_status": status,
         "objective_value": float(problem.value),
         "weights": weights,
         "expected_return": float(problem.value),
@@ -781,6 +999,20 @@ def maximize_return_with_cvar_constraint(
         result["warning"] = warning
     result = _enrich_with_metrics(
         result, scenario_returns, weights, beta, initial_capital=None
+    )
+    result = _apply_solution_governance(
+        result,
+        scenario_returns,
+        weights,
+        confidence_level=beta,
+        long_only=long_only,
+        min_weight=min_weight,
+        max_weight=max_weight,
+        expected_returns=expected_returns,
+        cvar_limit=float(cvar_limit),
+        solver_cvar=solver_cvar,
+        var_threshold=t_value,
+        excess_losses=u_values,
     )
     return result
 
@@ -800,14 +1032,10 @@ def minimize_cvar_for_target_return(
     """Minimize CVaR subject to ``E[r] @ w >= target_return``."""
     validate_scenario_matrix(scenario_returns)
     if not (0.0 < confidence_level < 1.0):
-        raise ValueError(
-            f"confidence_level must be in (0, 1), got {confidence_level}."
-        )
+        raise ValueError(f"confidence_level must be in (0, 1), got {confidence_level}.")
 
     if include_cash:
-        scenario_returns = add_cash_asset(
-            scenario_returns, cash_return=cash_return
-        )
+        scenario_returns = add_cash_asset(scenario_returns, cash_return=cash_return)
 
     if expected_returns is None:
         expected_returns = estimate_expected_returns(scenario_returns, "mean")
@@ -815,9 +1043,7 @@ def minimize_cvar_for_target_return(
         expected_returns = expected_returns.reindex(scenario_returns.columns)
         if expected_returns.isna().any():
             missing = expected_returns[expected_returns.isna()].index.tolist()
-            raise ValueError(
-                f"expected_returns missing for columns: {missing}"
-            )
+            raise ValueError(f"expected_returns missing for columns: {missing}")
 
     assets = list(scenario_returns.columns)
     R = scenario_returns.to_numpy(dtype=float)
@@ -867,9 +1093,19 @@ def minimize_cvar_for_target_return(
         index=assets,
         name="weight",
     )
+    t_value = float(t.value) if t.value is not None else float("nan")
+    u_values = (
+        np.asarray(u.value, dtype=float).reshape(-1)
+        if u.value is not None
+        else np.full(n_scenarios, float("nan"))
+    )
+    solver_cvar = t_value + (1.0 / ((1.0 - beta) * n_scenarios)) * float(
+        np.sum(u_values)
+    )
 
     result = {
         "status": status,
+        "solver_status": status,
         "objective_value": float(problem.value),
         "weights": weights,
         "expected_return": float("nan"),
@@ -886,6 +1122,20 @@ def minimize_cvar_for_target_return(
         result["warning"] = warning
     result = _enrich_with_metrics(
         result, scenario_returns, weights, beta, initial_capital=None
+    )
+    result = _apply_solution_governance(
+        result,
+        scenario_returns,
+        weights,
+        confidence_level=beta,
+        long_only=long_only,
+        min_weight=min_weight,
+        max_weight=max_weight,
+        expected_returns=expected_returns,
+        target_return=float(target_return),
+        solver_cvar=solver_cvar,
+        var_threshold=t_value,
+        excess_losses=u_values,
     )
     return result
 
@@ -917,9 +1167,7 @@ def generate_cvar_efficient_frontier(
         raise ValueError(f"n_points must be >= 2, got {n_points}.")
 
     if include_cash:
-        scenario_returns = add_cash_asset(
-            scenario_returns, cash_return=cash_return
-        )
+        scenario_returns = add_cash_asset(scenario_returns, cash_return=cash_return)
 
     if expected_returns is None:
         expected_returns = estimate_expected_returns(scenario_returns, "mean")
@@ -927,9 +1175,7 @@ def generate_cvar_efficient_frontier(
         expected_returns = expected_returns.reindex(scenario_returns.columns)
         if expected_returns.isna().any():
             missing = expected_returns[expected_returns.isna()].index.tolist()
-            raise ValueError(
-                f"expected_returns missing for columns: {missing}"
-            )
+            raise ValueError(f"expected_returns missing for columns: {missing}")
 
     assets = list(scenario_returns.columns)
 
@@ -962,7 +1208,23 @@ def generate_cvar_efficient_frontier(
         upper_problem._status = "solver_error"  # type: ignore[attr-defined]
 
     if _is_solved(upper_problem.status) and w.value is not None:
-        upper_return = float(np.dot(mu, np.asarray(w.value).flatten()))
+        upper_weights = pd.Series(
+            np.asarray(w.value, dtype=float).flatten(),
+            index=assets,
+        )
+        upper_validation = validate_solution_residuals(
+            scenario_returns,
+            upper_weights,
+            confidence_level=confidence_level,
+            long_only=long_only,
+            min_weight=min_weight,
+            max_weight=max_weight,
+        )
+        upper_return = (
+            float(np.dot(mu, upper_weights.to_numpy()))
+            if upper_validation["passed"]
+            else float(np.max(mu))
+        )
     else:
         upper_return = float(np.max(mu))
 
@@ -998,6 +1260,10 @@ def generate_cvar_efficient_frontier(
             "VaR": float(result.get("VaR", float("nan"))),
             "CVaR": float(result.get("CVaR", float("nan"))),
             "status": str(result.get("status", "unknown")),
+            "solver_status": str(result.get("solver_status", "unknown")),
+            "max_constraint_violation": float(
+                result.get("max_constraint_violation", float("nan"))
+            ),
         }
         weights = result.get("weights")
         if isinstance(weights, pd.Series):
@@ -1078,14 +1344,10 @@ def maximize_sharpe_ratio(
     """
     validate_scenario_matrix(scenario_returns)
     if not (0.0 < confidence_level < 1.0):
-        raise ValueError(
-            f"confidence_level must be in (0, 1), got {confidence_level}."
-        )
+        raise ValueError(f"confidence_level must be in (0, 1), got {confidence_level}.")
 
     if include_cash:
-        scenario_returns = add_cash_asset(
-            scenario_returns, cash_return=cash_return
-        )
+        scenario_returns = add_cash_asset(scenario_returns, cash_return=cash_return)
 
     assets = list(scenario_returns.columns)
     if expected_returns is None:
@@ -1110,6 +1372,7 @@ def maximize_sharpe_ratio(
 
     vol_floor = max(float(min_volatility), 0.0)
     best_weights: pd.Series | None = None
+    best_solver_status = "unknown"
     best_sharpe = -np.inf
     n_skipped_low_vol = 0
     for _, row in frontier.iterrows():
@@ -1127,6 +1390,7 @@ def maximize_sharpe_ratio(
                 {a: float(row.get(f"weight_{a}", float("nan"))) for a in assets},
                 name="weight",
             )
+            best_solver_status = str(row.get("solver_status", "unknown"))
 
     if best_weights is None or best_weights.isna().any():
         message = "No feasible candidate portfolio produced a finite Sharpe ratio."
@@ -1156,6 +1420,7 @@ def maximize_sharpe_ratio(
     )
     result = {
         "status": "optimal",
+        "solver_status": best_solver_status,
         "objective_value": float(metrics["sharpe_ratio"]),
         "weights": best_weights,
         "expected_return": float(metrics["expected_return"]),
@@ -1170,6 +1435,16 @@ def maximize_sharpe_ratio(
         "n_skipped_low_vol": n_skipped_low_vol,
         "message": "Selected max-Sharpe portfolio from the CVaR frontier candidates.",
     }
+    result = _apply_solution_governance(
+        result,
+        scenario_returns,
+        best_weights,
+        confidence_level=confidence_level,
+        long_only=long_only,
+        min_weight=min_weight,
+        max_weight=max_weight,
+        expected_returns=expected_returns,
+    )
 
     warnings: list[str] = []
     mu_warning = _zero_mu_warning(expected_returns.to_numpy(dtype=float))
@@ -1399,6 +1674,16 @@ def compute_feasible_risk_return_bounds(
             np.asarray(w.value, dtype=float).flatten(),
             index=list(scenario_returns.columns),
         )
+        validation = validate_solution_residuals(
+            scenario_returns,
+            weights,
+            confidence_level=confidence_level,
+            long_only=long_only,
+            min_weight=min_weight,
+            max_weight=max_weight,
+        )
+        if not validation["passed"]:
+            return bounds
         bounds["max_return"] = float(np.dot(mu, weights.to_numpy()))
         try:
             m = calculate_portfolio_scenario_metrics(
@@ -1661,6 +1946,7 @@ def interpret_optimization_result(
 # really want; keeps the module surface minimal otherwise.
 __all__ = [
     "validate_scenario_matrix",
+    "validate_solution_residuals",
     "add_cash_asset",
     "estimate_expected_returns",
     "calculate_portfolio_scenario_metrics",

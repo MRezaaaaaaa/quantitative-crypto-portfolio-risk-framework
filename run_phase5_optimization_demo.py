@@ -88,15 +88,11 @@ def _optimization_settings(config: dict) -> dict:
     risk = config.get("risk", {}) or {}
     return {
         "enabled": bool(opt.get("enabled", True)),
-        "scenario_source": str(
-            opt.get("default_scenario_source", "historical")
-        ),
+        "scenario_source": str(opt.get("default_scenario_source", "historical")),
         "confidence_level": float(
             opt.get("confidence_level", risk.get("confidence_level", 0.95))
         ),
-        "horizon_days": int(
-            opt.get("horizon_days", risk.get("time_horizon_days", 1))
-        ),
+        "horizon_days": int(opt.get("horizon_days", risk.get("time_horizon_days", 1))),
         "long_only": bool(opt.get("long_only", True)),
         "min_weight": (
             None if opt.get("min_weight") is None else float(opt.get("min_weight"))
@@ -109,15 +105,11 @@ def _optimization_settings(config: dict) -> dict:
         "cvar_limit": float(opt.get("cvar_limit", 0.10)),
         "target_return": float(opt.get("target_return", 0.02)),
         "n_frontier_points": int(opt.get("n_frontier_points", 20)),
-        "expected_returns_method": str(
-            opt.get("expected_returns_method", "mean")
-        ),
+        "expected_returns_method": str(opt.get("expected_returns_method", "mean")),
         "n_scenarios": int(opt.get("n_scenarios", 5000)),
         "student_t_df": float(opt.get("student_t_df", 5)),
         "random_seed": (
-            None
-            if opt.get("random_seed") is None
-            else int(opt.get("random_seed"))
+            None if opt.get("random_seed") is None else int(opt.get("random_seed"))
         ),
         "solver": opt.get("solver"),  # None or string
         "initial_capital": float(
@@ -165,10 +157,20 @@ def _print_header(config: dict, settings: dict, asset_returns: pd.DataFrame) -> 
     )
 
 
-def _print_portfolio_block(name: str, metrics: dict, extras: dict | None = None) -> None:
+def _print_portfolio_block(
+    name: str, metrics: dict, extras: dict | None = None
+) -> None:
     print()
     print(f" {name}:")
     print(f"   Status         : {metrics.get('status', 'n/a')}")
+    if "solver_status" in metrics:
+        print(f"   Solver Status  : {metrics.get('solver_status', 'n/a')}")
+    validation = metrics.get("constraint_validation")
+    if isinstance(validation, dict):
+        print(f"   Residual Check : {validation.get('status', 'not_run')}")
+        max_violation = validation.get("max_constraint_violation")
+        if max_violation is not None and not pd.isna(max_violation):
+            print(f"   Max Violation  : {float(max_violation):.3e}")
     print(f"   Expected Return: {_fmt_pct(metrics.get('expected_return'))}")
     print(f"   Volatility     : {_fmt_pct(metrics.get('volatility'))}")
     print(f"   VaR            : {_fmt_pct(metrics.get('VaR'))}")
@@ -215,8 +217,7 @@ def main() -> int:
     # ── Build scenario matrix ────────────────────────────────────────────
     print()
     print(
-        f"→ Building scenario matrix "
-        f"({_scenario_label(settings['scenario_source'])})…"
+        f"→ Building scenario matrix ({_scenario_label(settings['scenario_source'])})…"
     )
     scenarios = build_optimization_scenarios(
         asset_returns=asset_returns,
@@ -234,18 +235,13 @@ def main() -> int:
         scenarios = add_cash_asset(scenarios, cash_return=settings["cash_return"])
         # And include CASH=0 in the current-weights series.
         if "CASH" not in current_weights.index:
-            current_weights = pd.concat(
-                [current_weights, pd.Series({"CASH": 0.0})]
-            )
+            current_weights = pd.concat([current_weights, pd.Series({"CASH": 0.0})])
 
     expected_returns = estimate_expected_returns(
         scenarios, method=settings["expected_returns_method"]
     )
 
-    print(
-        f"   Scenarios shape : "
-        f"{scenarios.shape[0]:,} × {scenarios.shape[1]}"
-    )
+    print(f"   Scenarios shape : {scenarios.shape[0]:,} × {scenarios.shape[1]}")
 
     saved: list[str] = []
 
@@ -357,6 +353,13 @@ def main() -> int:
             {
                 "Portfolio": label,
                 "Status": res.get("status", "unknown"),
+                "Solver Status": res.get("solver_status", "unknown"),
+                "Residual Check": res.get("constraint_validation", {}).get(
+                    "status", "not_run"
+                ),
+                "Max Constraint Violation": res.get(
+                    "max_constraint_violation", float("nan")
+                ),
                 "Expected Return": res.get("expected_return", float("nan")),
                 "Volatility": res.get("volatility", float("nan")),
                 "VaR": res.get("VaR", float("nan")),
