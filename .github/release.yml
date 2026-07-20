@@ -1,0 +1,22 @@
+changelog:
+  categories:
+    - title: Financial methodology
+      labels:
+        - methodology
+        - model-risk
+    - title: Features
+      labels:
+        - enhancement
+    - title: Fixes
+      labels:
+        - bug
+    - title: Documentation and governance
+      labels:
+        - documentation
+        - governance
+    - title: Dependencies
+      labels:
+        - dependencies
+    - title: Other changes
+      labels:
+        - "*"

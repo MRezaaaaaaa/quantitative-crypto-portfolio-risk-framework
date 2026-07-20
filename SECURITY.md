@@ -26,3 +26,16 @@ Reports concerning credential exposure, dependency vulnerabilities, unsafe
 data handling, or code execution are in scope. Financial model limitations and
 investment performance disagreements are not security vulnerabilities, though
 they may be reported through the normal issue process after public release.
+
+## Repository security controls
+
+The repository defines pinned CodeQL and Dependency Review workflows and a
+local public-boundary policy check. These files are preparatory until they run
+successfully on GitHub; their presence alone is not evidence that scanning is
+active.
+
+Before public release, the repository owner must also enable GitHub Secret
+Scanning and Push Protection where available, enable Private Vulnerability
+Reporting, review Dependabot alerts, and protect the default branch with
+required CI/security checks. See the
+[public release checklist](docs/public-release-checklist.md).

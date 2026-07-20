@@ -29,6 +29,8 @@ performance.
   before parametric simulation.
 - Independently validates optimizer budget, bound, return, CVaR, and auxiliary
   constraint residuals instead of trusting solver status alone.
+- Enforces a local public/private publication boundary and defines pinned
+  CodeQL and dependency-review workflows for the future GitHub remote.
 - Exposes assumptions and diagnostics through an interactive Streamlit app.
 - Applies a centralized return policy: Simple for portfolio/NAV/scenario/
   optimization calculations, with Log available only for advanced distribution
@@ -213,7 +215,8 @@ Version `0.5.0` is a pre-1.0 research and development version. Work required
 before `v1.0.0` includes:
 
 - exercising the configured CI workflow on the future public GitHub remote;
-- adding security scanning and repository issue/PR templates;
+- exercising the security workflows and enabling remote-only Secret Scanning,
+  Push Protection, Private Vulnerability Reporting, and branch rules;
 - raising coverage from the current 68% floor toward 80%;
 - adding a publication dataset and artifact-manifest workflow.
 
@@ -230,6 +233,7 @@ See [CHANGELOG](CHANGELOG.md) and the specifications under `openspec/`.
 - [Data provenance](docs/data-provenance.md)
 - [Reproducibility](docs/reproducibility.md)
 - [Dependency management](docs/dependency-management.md)
+- [Public release checklist](docs/public-release-checklist.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 

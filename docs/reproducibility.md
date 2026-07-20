@@ -25,6 +25,8 @@ uv sync --locked --extra app --extra dev
 PYTHONDONTWRITEBYTECODE=1 uv run --locked --no-sync python -m pytest \
   -p no:cacheprovider -q
 
+uv run --locked --no-sync python -m scripts.check_public_boundary
+
 uv run --locked --no-sync python run_demo.py
 uv run --locked --no-sync python run_phase5_optimization_demo.py
 ```
@@ -106,6 +108,9 @@ actual data cutoff and should not be presented as exactly reproducible.
 Before `v1.0.0`, add:
 
 - a manifest generator for publication artifacts.
+
+The complete local and GitHub-hosted publication gates are listed in the
+[public release checklist](public-release-checklist.md).
 
 The committed `uv.lock` provides the exact dependency environment. CI verifies
 it on Python 3.10 through 3.13 and also runs lint, coverage, build, numerical

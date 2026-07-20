@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a reproducible implementation or interface defect.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include secrets, real holdings, client data, private datasets,
+        transaction records, or local machine paths. Security vulnerabilities
+        must follow `SECURITY.md` instead of this public form.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Package version or Git commit where the issue occurs.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Data loading and preprocessing
+        - Returns, horizons, or portfolio aggregation
+        - VaR, CVaR, or backtesting
+        - Monte Carlo or covariance
+        - Optimization or solver governance
+        - Streamlit interface or state
+        - Documentation or packaging
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Prefer the synthetic fixture or sanitized inputs.
+      placeholder: Commands, configuration, and smallest safe example.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: model_risk
+    attributes:
+      label: Potential financial or model-risk impact
+      description: Explain possible sign, unit, horizon, leakage, or allocation impact.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I removed secrets, local paths, private data, and real portfolio details.
+          required: true
+        - label: This is not a privately reportable security vulnerability.
+          required: true

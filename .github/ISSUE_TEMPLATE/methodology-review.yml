@@ -1,0 +1,49 @@
+name: Methodology or model-risk review
+description: Propose or challenge a financial-methodology assumption.
+title: "[Methodology]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is for model assumptions, formulas, validation logic, and
+        interpretation. It is not evidence that a method predicts performance.
+  - type: textarea
+    id: question
+    attributes:
+      label: Methodology question or proposed change
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior and hidden assumptions
+      description: Include return convention, horizon, sign/unit, and estimation window.
+    validations:
+      required: true
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed formulation
+      description: Provide formulas, references, inputs, outputs, and edge cases.
+    validations:
+      required: true
+  - type: textarea
+    id: bias
+    attributes:
+      label: Bias and validation analysis
+      description: Address look-ahead, leakage, overfitting, dependence, and sample selection.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Tests and acceptance criteria
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Publication boundary
+      options:
+        - label: The proposal contains no private data, credentials, or proprietary parameters.
+          required: true

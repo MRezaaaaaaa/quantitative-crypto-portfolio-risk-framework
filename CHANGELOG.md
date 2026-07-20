@@ -8,6 +8,13 @@ Versioning when it reaches a public release.
 
 ### Added
 
+- Pinned CodeQL and Dependency Review workflows with least-privilege job
+  permissions and explicit timeouts.
+- Tested public/private repository-boundary scanner integrated into CI.
+- Pull-request, bug, feature, and methodology-review templates plus structured
+  release-note categories.
+- Public release checklist separating local gates from remote-only GitHub
+  security settings.
 - Covariance symmetry, eigenvalue, conditioning, and positive-definiteness
   diagnostics with deterministic correlation-space repair before parametric
   simulation.

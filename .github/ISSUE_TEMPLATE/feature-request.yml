@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose a scoped, testable product capability.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the user or research need, not only the desired UI.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed capability
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Scope boundaries and exclusions
+      description: State what this request intentionally does not implement.
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: Data, implementation, and model risks
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Publication boundary
+      options:
+        - label: The request contains no secret, private data, or real portfolio details.
+          required: true
