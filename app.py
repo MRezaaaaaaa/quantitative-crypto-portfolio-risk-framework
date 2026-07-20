@@ -1789,15 +1789,20 @@ with tab_backtest:
         with row2[3]:
             status = result["traffic_light"]
             if status == "Green":
-                st.success("🟢 Green — Model Valid")
+                st.success("🟢 Green — Breach Count Within Threshold")
             elif status == "Yellow":
-                st.warning("🟡 Yellow — Review Model")
+                st.warning("🟡 Yellow — Review Breach Count")
             elif status == "Red":
-                st.error("🔴 Red — Model Unreliable")
+                st.error("🔴 Red — Breach Count Outside Threshold")
             else:
                 st.info(f"Status: {status}")
 
         st.caption(result["interpretation"])
+
+        if result["christoffersen_pass"] is None:
+            st.warning(result["christoffersen_interpretation"])
+        if result["cc_pass"] is None:
+            st.warning(result["cc_interpretation"])
 
         chart_a, chart_b = st.tabs(["📈 Backtest Chart", "📅 Breach Timeline"])
         with chart_a:

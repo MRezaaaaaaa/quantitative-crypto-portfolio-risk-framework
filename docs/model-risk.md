@@ -53,8 +53,11 @@ identify economic regimes.
 - Small samples have low power.
 - Overlapping horizons violate simple independence assumptions.
 - Selecting a method after comparing many backtests introduces selection bias.
-- The current degenerate Christoffersen case is a known issue pending a separate
-  correction.
+- An all-breach or no-breach sequence cannot identify both transition
+  probabilities required by the Christoffersen independence test; the project
+  reports independence and conditional coverage as inconclusive in this case.
+- A green traffic light summarizes breach frequency only. It does not override
+  an inconclusive independence test or establish full model validity.
 
 ## Optimization risk
 

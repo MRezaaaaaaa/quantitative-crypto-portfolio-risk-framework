@@ -25,6 +25,11 @@ Versioning when it reaches a public release.
 
 ### Changed
 
+- Corrected all-breach and no-breach Christoffersen results from a synthetic
+  pass to an explicit inconclusive result, propagated through conditional
+  coverage, reporting, and the Streamlit presentation.
+- Clarified that backtesting traffic lights describe breach frequency rather
+  than complete model validity.
 - Synchronized package development-version metadata at 0.5.0.
 - Updated contributor setup and quality gates to use the exact locked
   environment.

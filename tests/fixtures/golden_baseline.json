@@ -1,6 +1,10 @@
 {
   "backtesting": {
     "breach_count": 2,
+    "christoffersen_lr_statistic": 0.15388410681934417,
+    "christoffersen_p_value": 0.6948508607406052,
+    "conditional_coverage_lr_statistic": 0.3907835893085547,
+    "conditional_coverage_p_value": 0.8225123389812062,
     "forecast_count": 55,
     "kupiec_lr_statistic": 0.23689948248921056,
     "kupiec_p_value": 0.6264544953491247,

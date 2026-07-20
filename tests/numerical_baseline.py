@@ -11,7 +11,12 @@ from var_cvar_crypto_risk.assumptions import (
     estimate_covariance_robust,
     estimate_expected_returns_robust,
 )
-from var_cvar_crypto_risk.backtesting import kupiec_pof_test, rolling_var_forecast
+from var_cvar_crypto_risk.backtesting import (
+    christoffersen_cc_test,
+    christoffersen_independence_test,
+    kupiec_pof_test,
+    rolling_var_forecast,
+)
 from var_cvar_crypto_risk.cvar_models import gaussian_cvar, historical_cvar
 from var_cvar_crypto_risk.monte_carlo import (
     calculate_portfolio_scenario_returns,
@@ -126,6 +131,10 @@ def compute_numerical_baseline() -> dict:
         backtest_mode="non_overlapping",
     )
     kupiec = kupiec_pof_test(backtest["breach"], CONFIDENCE_LEVEL)
+    independence = christoffersen_independence_test(backtest["breach"])
+    conditional_coverage = christoffersen_cc_test(
+        backtest["breach"], CONFIDENCE_LEVEL
+    )
 
     return {
         "schema_version": 1,
@@ -186,5 +195,15 @@ def compute_numerical_baseline() -> dict:
             "mean_var_forecast": float(backtest["var_forecast"].mean()),
             "kupiec_lr_statistic": float(kupiec["lr_statistic"]),
             "kupiec_p_value": float(kupiec["p_value"]),
+            "christoffersen_lr_statistic": float(
+                independence["lr_statistic"]
+            ),
+            "christoffersen_p_value": float(independence["p_value"]),
+            "conditional_coverage_lr_statistic": float(
+                conditional_coverage["lr_cc"]
+            ),
+            "conditional_coverage_p_value": float(
+                conditional_coverage["p_value"]
+            ),
         },
     }

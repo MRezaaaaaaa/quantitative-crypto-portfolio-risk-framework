@@ -194,7 +194,6 @@ See [Model risk](docs/model-risk.md) for the complete interpretation framework.
 Version `0.5.0` is a pre-1.0 research and development version. Work required
 before `v1.0.0` includes:
 
-- correcting degenerate Christoffersen-test interpretation;
 - formalizing the signed VaR/CVaR output contract;
 - adding covariance-repair and solver-residual governance;
 - exercising the configured CI workflow on the future public GitHub remote;

@@ -73,9 +73,12 @@ The project implements:
 - Basel-inspired and rate-based traffic-light summaries.
 
 These components do not constitute a complete regulatory validation framework.
-Degenerate all-breach or no-breach independence results are a known pre-1.0
-issue and will be changed from `pass` to `inconclusive` in a separately reviewed
-methodology fix.
+For an all-breach or no-breach hit sequence, one previous-state transition row
+is never observed. Both Markov transition probabilities therefore cannot be
+identified: the independence statistic, p-value, and conditional-coverage test
+are reported as `inconclusive`, not `pass`. The breach-frequency traffic light
+remains a separate descriptive result and must not be interpreted as proof that
+independence or full model validity has been established.
 
 ## Monte Carlo
 

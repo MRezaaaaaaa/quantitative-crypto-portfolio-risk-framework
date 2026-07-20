@@ -315,12 +315,27 @@ def test_christoffersen_random_passes(random_breach_series):
     assert res["p_value"] > 0.05
 
 
-def test_christoffersen_all_same_no_crash(all_breach_series, no_breach_series):
-    """All-True or all-False input must not crash."""
-    r1 = christoffersen_independence_test(all_breach_series)
-    r2 = christoffersen_independence_test(no_breach_series)
-    assert np.isfinite(r1["p_value"])
-    assert np.isfinite(r2["p_value"])
+@pytest.mark.parametrize(
+    ("fixture_name", "defined_probability", "undefined_probability"),
+    [
+        ("all_breach_series", "pi11", "pi01"),
+        ("no_breach_series", "pi01", "pi11"),
+    ],
+)
+def test_christoffersen_all_same_is_inconclusive(
+    request,
+    fixture_name,
+    defined_probability,
+    undefined_probability,
+):
+    """A one-state hit sequence cannot identify both Markov transitions."""
+    res = christoffersen_independence_test(request.getfixturevalue(fixture_name))
+    assert res["pass_test"] is None
+    assert np.isnan(res["lr_statistic"])
+    assert np.isnan(res["p_value"])
+    assert np.isfinite(res[defined_probability])
+    assert np.isnan(res[undefined_probability])
+    assert "inconclusive" in res["interpretation"].lower()
 
 
 def test_christoffersen_short_series_graceful():
@@ -361,6 +376,18 @@ def test_cc_test_uses_df2():
     assert cc["p_value"] == pytest.approx(expected_p_df2, abs=1e-12)
     if cc["lr_cc"] > 1e-6:
         assert cc["p_value"] != pytest.approx(expected_p_df1, abs=1e-6)
+
+
+@pytest.mark.parametrize("fixture_name", ["all_breach_series", "no_breach_series"])
+def test_cc_all_same_is_inconclusive(request, fixture_name):
+    """CC cannot be computed when its independence component is unidentified."""
+    breaches = request.getfixturevalue(fixture_name)
+    cc = christoffersen_cc_test(breaches, confidence_level=0.95)
+    assert cc["pass_test"] is None
+    assert np.isnan(cc["lr_ind"])
+    assert np.isnan(cc["lr_cc"])
+    assert np.isnan(cc["p_value"])
+    assert "inconclusive" in cc["interpretation"].lower()
 
 
 # ── assign_traffic_light_status ─────────────────────────────────────────────
@@ -514,8 +541,9 @@ def test_backtest_var_model_result_keys(clean_returns_1000):
         "actual_breaches", "expected_breaches", "expected_breach_rate",
         "actual_breach_rate", "breach_ratio",
         "kupiec_lr_statistic", "kupiec_p_value", "kupiec_pass",
-        "christoffersen_lr_statistic", "christoffersen_p_value", "christoffersen_pass",
-        "cc_lr_statistic", "cc_p_value", "cc_pass",
+        "christoffersen_lr_statistic", "christoffersen_p_value",
+        "christoffersen_pass", "christoffersen_interpretation",
+        "cc_lr_statistic", "cc_p_value", "cc_pass", "cc_interpretation",
         "traffic_light", "traffic_light_mode_used", "interpretation",
     }
     assert expected.issubset(result.keys())
@@ -527,6 +555,25 @@ def test_backtest_var_model_traffic_light_valid(clean_returns_1000):
         clean_returns_1000, method="historical", confidence_level=0.95, window=252
     )
     assert result["traffic_light"] in {"Green", "Yellow", "Red"}
+
+
+def test_backtest_propagates_inconclusive_independence() -> None:
+    """A no-breach backtest exposes inconclusive IND/CC results to callers."""
+    returns = pd.Series(
+        np.zeros(100),
+        index=pd.date_range("2024-01-01", periods=100, freq="D"),
+    )
+    _, result = backtest_var_model(
+        returns,
+        method="historical",
+        confidence_level=0.95,
+        window=30,
+    )
+    assert result["actual_breaches"] == 0
+    assert result["christoffersen_pass"] is None
+    assert result["cc_pass"] is None
+    assert "inconclusive" in result["christoffersen_interpretation"].lower()
+    assert "inconclusive" in result["cc_interpretation"].lower()
 
 
 # ── compare_var_models_backtest ──────────────────────────────────────────────
@@ -603,7 +650,7 @@ def test_report_table_has_required_columns(clean_returns_1000):
 
 
 def test_report_table_formats_pass_correctly(clean_returns_1000):
-    """Pass columns show '✓ Pass' or '✗ Fail'."""
+    """Pass columns distinguish pass, fail, and inconclusive."""
     _, comparison = compare_var_models_backtest(
         clean_returns_1000,
         methods=["historical", "gaussian", "cornish_fisher"],
@@ -612,7 +659,37 @@ def test_report_table_formats_pass_correctly(clean_returns_1000):
     report = create_backtesting_report_table(comparison)
     for col in ("Kupiec Pass", "Christoffersen Pass", "CC Pass"):
         for value in report[col]:
-            assert value in {"✓ Pass", "✗ Fail", "N/A"}
+            assert value in {"✓ Pass", "✗ Fail", "— Inconclusive"}
+
+
+def test_report_table_labels_none_as_inconclusive() -> None:
+    """A statistical non-result must not be presented as a generic missing value."""
+    comparison = pd.DataFrame(
+        [
+            {
+                "method": "historical",
+                "horizon_days": 1,
+                "backtest_mode": "non_overlapping",
+                "observations": 100,
+                "actual_breaches": 0,
+                "expected_breaches": 5.0,
+                "actual_breach_rate": 0.0,
+                "expected_breach_rate": 0.05,
+                "kupiec_p_value": 0.01,
+                "kupiec_pass": False,
+                "christoffersen_p_value": np.nan,
+                "christoffersen_pass": None,
+                "cc_p_value": np.nan,
+                "cc_pass": None,
+                "traffic_light": "Green",
+                "interpretation": "Frequency-only traffic light.",
+                "error": None,
+            }
+        ]
+    )
+    report = create_backtesting_report_table(comparison)
+    assert report.loc[0, "Christoffersen Pass"] == "— Inconclusive"
+    assert report.loc[0, "CC Pass"] == "— Inconclusive"
 
 
 # ── Phase 4: horizon-aware backtesting ──────────────────────────────────────

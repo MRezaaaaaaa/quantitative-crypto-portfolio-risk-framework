@@ -513,21 +513,28 @@ def christoffersen_independence_test(
     total = n00 + n01 + n10 + n11
     breach_count = int(arr.sum())
     if breach_count == 0 or breach_count == n:
+        denominator_0 = n00 + n01
+        denominator_1 = n10 + n11
+        pi01 = n01 / denominator_0 if denominator_0 > 0 else float("nan")
+        pi11 = n11 / denominator_1 if denominator_1 > 0 else float("nan")
+        missing_state = "breach" if breach_count == 0 else "non-breach"
         return {
             "test_name": "Christoffersen Independence",
             "n00": n00,
             "n01": n01,
             "n10": n10,
             "n11": n11,
-            "pi01": 0.0,
-            "pi11": 0.0,
-            "pi": breach_count / n if n > 0 else 0.0,
-            "lr_statistic": 0.0,
-            "p_value": 1.0,
-            "pass_test": True,
+            "pi01": float(pi01),
+            "pi11": float(pi11),
+            "pi": breach_count / n,
+            "lr_statistic": float("nan"),
+            "p_value": float("nan"),
+            "pass_test": None,
             "interpretation": (
-                "All-same breach series; independence cannot be rejected "
-                "(degenerate but well-defined case)."
+                "Christoffersen Independence test inconclusive: the hit "
+                f"sequence contains no {missing_state} observations, so both "
+                "first-order Markov transition probabilities cannot be "
+                "identified."
             ),
         }
 
@@ -613,6 +620,21 @@ def christoffersen_cc_test(
 
     lr_pof = pof["lr_statistic"]
     lr_ind = ind["lr_statistic"]
+
+    if pof["pass_test"] is None or ind["pass_test"] is None:
+        return {
+            "test_name": "Christoffersen CC",
+            "lr_pof": lr_pof,
+            "lr_ind": lr_ind,
+            "lr_cc": float("nan"),
+            "p_value": float("nan"),
+            "pass_test": None,
+            "interpretation": (
+                "Conditional Coverage test inconclusive — its unconditional "
+                "coverage or independence component is not identifiable for "
+                "this hit sequence."
+            ),
+        }
 
     if not (np.isfinite(lr_pof) and np.isfinite(lr_ind)):
         return {
@@ -857,9 +879,11 @@ def backtest_var_model(
         "christoffersen_lr_statistic": ind["lr_statistic"],
         "christoffersen_p_value": ind["p_value"],
         "christoffersen_pass": ind["pass_test"],
+        "christoffersen_interpretation": ind["interpretation"],
         "cc_lr_statistic": cc["lr_cc"],
         "cc_p_value": cc["p_value"],
         "cc_pass": cc["pass_test"],
+        "cc_interpretation": cc["interpretation"],
         "traffic_light": traffic_light,
         "traffic_light_mode_used": effective_mode,
         "interpretation": interpretation,
@@ -921,8 +945,12 @@ def compare_var_models_backtest(
                 "kupiec_pass": result["kupiec_pass"],
                 "christoffersen_p_value": result["christoffersen_p_value"],
                 "christoffersen_pass": result["christoffersen_pass"],
+                "christoffersen_interpretation": result[
+                    "christoffersen_interpretation"
+                ],
                 "cc_p_value": result["cc_p_value"],
                 "cc_pass": result["cc_pass"],
+                "cc_interpretation": result["cc_interpretation"],
                 "traffic_light": result["traffic_light"],
                 "traffic_light_mode_used": result["traffic_light_mode_used"],
                 "interpretation": result["interpretation"],
@@ -946,8 +974,10 @@ def compare_var_models_backtest(
                 "kupiec_pass": None,
                 "christoffersen_p_value": float("nan"),
                 "christoffersen_pass": None,
+                "christoffersen_interpretation": "Backtest failed.",
                 "cc_p_value": float("nan"),
                 "cc_pass": None,
+                "cc_interpretation": "Backtest failed.",
                 "traffic_light": "N/A",
                 "interpretation": f"Backtest failed: {exc}",
                 "error": str(exc),
@@ -968,7 +998,7 @@ def _format_pass(value: object) -> str:
         return "✓ Pass"
     if value is False:
         return "✗ Fail"
-    return "N/A"
+    return "— Inconclusive"
 
 
 def _format_float(value: object, decimals: int) -> str:
