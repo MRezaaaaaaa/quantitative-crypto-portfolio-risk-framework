@@ -9,11 +9,15 @@ Versioning when it reaches a public release.
 ### Added
 
 - Repository governance and release-hygiene files.
+- Focused architecture, methodology, model-risk, data-provenance, and
+  reproducibility documentation.
 
 ### Changed
 
 - Synchronized package development-version metadata at 0.5.0.
 - Corrected release-blocking README phase and feature contradictions.
+- Replaced the phase-by-phase README log with a current product overview and
+  qualified unsupported regulatory and model-performance claims.
 
 ## [0.5.0] - 2026-07-19
 
@@ -23,6 +27,3 @@ Versioning when it reaches a public release.
 - Robust expected-return, volatility, and covariance assumptions.
 - Optimizer input-governance diagnostics.
 - Horizon-aware VaR backtesting and Monte Carlo scenarios.
-
-[Unreleased]: https://github.com/OWNER/REPOSITORY/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/OWNER/REPOSITORY/releases/tag/v0.5.0
