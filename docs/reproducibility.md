@@ -12,26 +12,60 @@ The project distinguishes three levels:
 3. **Research reproducibility** — a reader can obtain legally usable input data
    and regenerate every table or figure used in an article.
 
-Version 0.5.0 establishes a tested code baseline. A pinned article dataset and
-artifact manifest are still required for full research reproducibility.
+Version 0.5.0 establishes a tested code baseline, a cross-platform dependency
+lock, and a deterministic synthetic numerical baseline. A pinned article
+dataset and publication-artifact manifest are still required for full research
+reproducibility.
 
 ## Current workflow
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[app,dev]"
+uv sync --locked --extra app --extra dev
 
-PYTHONDONTWRITEBYTECODE=1 python -m pytest \
-  -p no:cacheprovider --disable-warnings -q
+PYTHONDONTWRITEBYTECODE=1 uv run --locked --no-sync python -m pytest \
+  -p no:cacheprovider -q
 
-python run_demo.py
-python run_phase5_optimization_demo.py
+uv run --locked --no-sync python run_demo.py
+uv run --locked --no-sync python run_phase5_optimization_demo.py
 ```
 
 Generated files are written beneath `outputs/` and intentionally ignored by
 Git.
+
+## Numerical golden baseline
+
+`tests/fixtures/synthetic_daily_prices.csv` is a deterministic, synthetic
+three-asset price history. It is not vendor data, a calibrated market model, or
+an investable backtest. Its only purpose is to detect unintended numerical
+changes across the public analytics pipeline.
+
+`tests/fixtures/golden_baseline.json` records:
+
+- the synthetic input and `uv.lock` SHA-256 hashes;
+- simple portfolio-return statistics;
+- Historical, Gaussian, and Cornish-Fisher VaR;
+- Historical and Gaussian CVaR;
+- robust expected-return estimates;
+- sample, EWMA, and constant-correlation shrinkage covariance estimates;
+- seeded seven-day Normal Monte Carlo risk; and
+- a one-day rolling Gaussian VaR/Kupiec snapshot.
+
+Deterministic analytical outputs use `rtol=1e-10` and `atol=1e-12`. Seeded
+Monte Carlo outputs use `rtol=1e-7` and `atol=1e-9` to allow immaterial
+cross-platform linear-algebra variation without accepting economically
+meaningful drift.
+
+Print a candidate baseline with:
+
+```bash
+uv run --locked --no-sync python -m scripts.generate_numerical_baseline
+```
+
+Replacing the committed file requires the explicit `--write` option. A changed
+golden file is never an automatic fix: the reviewer must identify whether the
+cause is an intended formula change, a dependency update, a tolerance problem,
+or a regression. The numerical baseline tests code stability; it does not
+validate model accuracy or future risk forecasts.
 
 ## Recording an experiment
 
@@ -68,13 +102,11 @@ actual data cutoff and should not be presented as exactly reproducible.
 
 Before `v1.0.0`, add:
 
-- a reviewed cross-platform lock strategy based on `pyproject.toml`;
-- wheel and source-distribution installation checks;
-- a synthetic or redistribution-approved article fixture;
-- golden numerical outputs with explicit tolerances;
 - a manifest generator for publication artifacts.
 
-CI now performs clean installation and regression tests on Python 3.10 through
-3.13, plus lint, coverage, build, and Streamlit startup checks. These gates test
-compatibility against the declared dependency ranges; they do not replace a
-pinned research environment.
+The committed `uv.lock` provides the exact dependency environment. CI verifies
+it on Python 3.10 through 3.13 and also runs lint, coverage, build, numerical
+baseline, and Streamlit startup checks. The synthetic fixture under
+`tests/fixtures/` is safe to redistribute and guards deterministic calculations
+within documented tolerances; it is not evidence of forecasting performance or
+market validity.

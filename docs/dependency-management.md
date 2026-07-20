@@ -8,6 +8,8 @@ supported version ranges.
 - Core runtime packages are declared in `project.dependencies`.
 - Streamlit is isolated in the `app` optional dependency group.
 - Test, coverage, build, and lint tools are isolated in the `dev` group.
+- The build backend and wheel builder appear in both `build-system.requires`
+  and the `dev` group so CI can build without a second, unlocked resolver.
 - `requirements.txt` and `requirements-dev.txt` are thin compatibility entry
   points; they must not duplicate package versions.
 
@@ -37,15 +39,44 @@ fixtures, build, and application smoke checks pass.
 
 ## Lock strategy
 
-No lockfile is committed yet. Creating a lock from an unrelated global Python
-environment would capture platform-specific and extraneous packages and would
-create false reproducibility.
+`uv.lock` is the committed, cross-platform snapshot of all direct and
+transitive packages, including numerical solvers. It covers the declared
+Python support window, 3.10 through 3.13. `pyproject.toml` remains the package
+metadata and dependency-policy source; the lockfile must never be edited by
+hand.
 
-Before `v1.0.0`, adopt one reviewed cross-platform lock workflow, generate the
-lock from `pyproject.toml`, and verify it on every supported Python version. The
-chosen lock must record solver and scientific-computing dependencies without
-replacing `pyproject.toml` as the package metadata source.
+The lock was generated with uv 0.11.16. Install that version of uv, then create
+the exact development environment with:
 
-Until that decision is implemented, CI clean installation across Python 3.10 to
-3.13 is the compatibility gate; it is not equivalent to a fully locked research
-environment.
+```bash
+uv sync --locked --extra app --extra dev
+```
+
+Run commands without allowing an implicit lock update:
+
+```bash
+uv run --locked --no-sync python -m pytest -p no:cacheprovider -q
+uv run --locked --no-sync ruff check app.py run_demo.py \
+  run_phase5_optimization_demo.py src tests scripts
+```
+
+`uv lock --check` is the mechanical gate that confirms the lock still matches
+`pyproject.toml`. Intentional dependency updates use `uv lock --upgrade-package
+<package>` in a dedicated change, followed by the regression and numerical
+baseline suites. A plain `uv lock --upgrade` is not part of routine execution.
+
+The thin `requirements*.txt` files remain available for users who prefer pip,
+but pip installs resolve within the declared ranges and are therefore
+compatibility installs, not the exact research environment.
+
+## CI policy
+
+CI uses the same committed lockfile in every Python 3.10–3.13 job. The lock
+check fails if dependency metadata changes without a reviewed lock update.
+Dependabot proposals remain separate for Python packages so any change in
+financial outputs can be attributed to a specific upgrade.
+
+Release artifacts are built with `python -m build --no-isolation` inside the
+locked development environment. Omitting `--no-isolation` would create a second
+temporary environment and resolve build requirements independently of
+`uv.lock`, weakening artifact reproducibility.

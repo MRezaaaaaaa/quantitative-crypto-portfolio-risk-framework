@@ -16,15 +16,25 @@ Versioning when it reaches a public release.
 - GitHub Actions CI for the supported Python matrix, lint, coverage, package
   build, and Streamlit startup checks.
 - Dependabot configuration for Python and GitHub Actions dependencies.
+- Cross-platform `uv.lock` for Python 3.10 through 3.13.
+- Synthetic daily-price fixture and reviewed numerical golden baseline covering
+  returns, VaR/CVaR, robust assumptions, covariance, Monte Carlo, and
+  backtesting outputs.
+- Source-distribution manifest containing the documentation, configuration,
+  maintenance scripts, complete test support files, and synthetic fixtures.
 
 ### Changed
 
 - Synchronized package development-version metadata at 0.5.0.
+- Updated contributor setup and quality gates to use the exact locked
+  environment.
 - Corrected release-blocking README phase and feature contradictions.
 - Replaced the phase-by-phase README log with a current product overview and
   qualified unsupported regulatory and model-performance claims.
 - Removed unused imports and one redundant f-string to establish the initial
   lint baseline without changing financial behavior.
+- Switched CI installation and execution to the committed uv lockfile.
+- Aligned the declared Python support window with the tested 3.10–3.13 matrix.
 
 ## [0.5.0] - 2026-07-19
 

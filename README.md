@@ -1,6 +1,6 @@
 # Crypto Portfolio Risk Platform
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.10--3.13-blue)](https://www.python.org/)
 [![Version](https://img.shields.io/badge/version-0.5.0-informational)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -40,43 +40,42 @@ compliance.
 
 ## Quick start
 
-Python 3.10 or later is required.
+Python 3.10 through 3.13 and uv 0.11.16 are required for the exact locked
+environment.
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[app,dev]"
+uv sync --locked --extra app --extra dev
 ```
 
 Run the Streamlit application:
 
 ```bash
-streamlit run app.py
+uv run --locked --no-sync streamlit run app.py
 ```
 
 Run the command-line analysis pipeline:
 
 ```bash
-python run_demo.py
+uv run --locked --no-sync python run_demo.py
 ```
 
 Run the optimization demo:
 
 ```bash
-python run_phase5_optimization_demo.py
+uv run --locked --no-sync python run_phase5_optimization_demo.py
 ```
 
 Run the regression suite without writing bytecode or pytest cache files:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python -m pytest \
-  -p no:cacheprovider --disable-warnings -q
+PYTHONDONTWRITEBYTECODE=1 uv run --locked --no-sync python -m pytest \
+  -p no:cacheprovider -q
 ```
 
-The current baseline contains 244 passing tests. This is a snapshot, not a
-permanent quality guarantee; the CI workflow will become the authoritative
-status once it is added.
+The current local baseline contains 245 passing tests, including one
+cross-module numerical golden test. This is a snapshot, not a permanent quality
+guarantee; GitHub Actions becomes the authoritative gate after the repository
+is pushed and its workflow completes successfully.
 
 ## Data
 
@@ -126,6 +125,7 @@ technical debt.
 ├── notebooks/
 ├── openspec/                     # specifications and historical change records
 ├── outputs/                      # generated results; ignored
+├── scripts/                      # explicit maintenance utilities
 ├── src/var_cvar_crypto_risk/
 ├── tests/
 ├── run_demo.py
@@ -155,7 +155,7 @@ See [Methodology and horizon conventions](docs/methodology.md).
 ## Reproducing results
 
 Generated outputs are intentionally not committed. To recreate them, install
-the project, review the YAML configurations, then run `python run_demo.py` or
+the project, review the YAML configurations, then run the command-line demo or
 the relevant Streamlit workflow.
 
 A live vendor run is not perfectly reproducible because upstream data can be
@@ -165,7 +165,7 @@ package version, and random seed.
 
 See [Reproducibility](docs/reproducibility.md).
 
-Dependency declarations and the remaining lockfile decision are documented in
+Dependency declarations and the committed lockfile workflow are documented in
 [Dependency management](docs/dependency-management.md).
 
 ## Known limitations
@@ -197,9 +197,10 @@ before `v1.0.0` includes:
 - correcting degenerate Christoffersen-test interpretation;
 - formalizing the signed VaR/CVaR output contract;
 - adding covariance-repair and solver-residual governance;
-- adding clean-install, artifact-build, and Streamlit smoke checks;
-- adding GitHub CI and security automation;
-- protecting architectural refactors with numerical regression fixtures.
+- exercising the configured CI workflow on the future public GitHub remote;
+- adding security scanning and repository issue/PR templates;
+- raising coverage from the current 68% floor toward 80%;
+- adding a publication dataset and artifact-manifest workflow.
 
 See [CHANGELOG](CHANGELOG.md) and the specifications under `openspec/`.
 

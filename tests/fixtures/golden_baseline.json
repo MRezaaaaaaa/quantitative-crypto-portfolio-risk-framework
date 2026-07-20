@@ -1,0 +1,141 @@
+{
+  "backtesting": {
+    "breach_count": 2,
+    "forecast_count": 55,
+    "kupiec_lr_statistic": 0.23689948248921056,
+    "kupiec_p_value": 0.6264544953491247,
+    "mean_var_forecast": 0.03292430810187553
+  },
+  "covariance": {
+    "ewma": {
+      "BTC": {
+        "BTC": 0.0002963530517807411,
+        "ETH": 0.0003120168990961702,
+        "SOL": 0.0003736378060843316
+      },
+      "ETH": {
+        "BTC": 0.0003120168990961702,
+        "ETH": 0.00034997090578070506,
+        "SOL": 0.00040717160764180776
+      },
+      "SOL": {
+        "BTC": 0.0003736378060843316,
+        "ETH": 0.00040717160764180776,
+        "SOL": 0.0005834638519149441
+      }
+    },
+    "sample": {
+      "BTC": {
+        "BTC": 0.0002845823032685513,
+        "ETH": 0.00034270770435876634,
+        "SOL": 0.00043805148615942637
+      },
+      "ETH": {
+        "BTC": 0.00034270770435876634,
+        "ETH": 0.0004526094736648203,
+        "SOL": 0.0005513668626683321
+      },
+      "SOL": {
+        "BTC": 0.00043805148615942637,
+        "ETH": 0.0005513668626683321,
+        "SOL": 0.0007900703182602182
+      }
+    },
+    "shrinkage_constant_correlation": {
+      "BTC": {
+        "BTC": 0.0002845823032685513,
+        "ETH": 0.00034117769549741727,
+        "SOL": 0.0004389773322531499
+      },
+      "ETH": {
+        "BTC": 0.00034117769549741727,
+        "ETH": 0.00045260947366482034,
+        "SOL": 0.00055274856703164
+      },
+      "SOL": {
+        "BTC": 0.0004389773322531499,
+        "ETH": 0.00055274856703164,
+        "SOL": 0.0007900703182602182
+      }
+    }
+  },
+  "expected_returns": {
+    "mean": {
+      "BTC": 0.0009065932229654519,
+      "ETH": 0.0003177879323309064,
+      "SOL": 0.0016646211274973933
+    },
+    "median": {
+      "BTC": 0.0011695906376263387,
+      "ETH": 0.0012503460862447469,
+      "SOL": 0.004122385247370186
+    },
+    "shrinkage_to_zero": {
+      "BTC": 0.00045329661148272595,
+      "ETH": 0.0001588939661654532,
+      "SOL": 0.0008323105637486967
+    },
+    "trimmed_mean": {
+      "BTC": 0.0013870562614072327,
+      "ETH": 0.0010647361711728974,
+      "SOL": 0.002983289171300769
+    },
+    "winsorized_mean": {
+      "BTC": 0.0016328422999546876,
+      "ETH": 0.0010331350370503655,
+      "SOL": 0.002440680803720103
+    }
+  },
+  "input": {
+    "assets": [
+      "BTC",
+      "ETH",
+      "SOL"
+    ],
+    "fixture": "tests/fixtures/synthetic_daily_prices.csv",
+    "fixture_sha256": "2bab3fd42995c5c53aa33b3f56031591823b2800afb62d3fe6641f0f6b132cd8",
+    "lock_sha256": "951dd8fc6274e9bbfa03f3d39cdb95c86018e49019c3103ba4d816633e983c23",
+    "price_observations": 96,
+    "return_observations": 95
+  },
+  "monte_carlo": {
+    "cvar": 0.10288151731069134,
+    "maximum": 0.17388959337557852,
+    "minimum": -0.16378517268663095,
+    "portfolio_mean": 0.005418670222393118,
+    "portfolio_volatility": 0.05232617606149417,
+    "var": 0.08089584459142461
+  },
+  "parameters": {
+    "backtest_window": 40,
+    "confidence_level": 0.95,
+    "ewma_lambda": 0.92,
+    "mc_horizon_days": 7,
+    "mc_scenarios": 4096,
+    "mc_seed": 20260720,
+    "mean_shrinkage_weight": 0.5,
+    "shrinkage_delta": 0.2,
+    "shrinkage_target": "constant_correlation",
+    "trim_proportion_each_tail": 0.1,
+    "weights": {
+      "BTC": 0.5,
+      "ETH": 0.3,
+      "SOL": 0.2
+    },
+    "winsor_proportion_each_tail": 0.1
+  },
+  "portfolio": {
+    "maximum": 0.07481783976597793,
+    "mean": 0.0008815572166814765,
+    "minimum": -0.10317622860036291,
+    "volatility": 0.02000174675464859
+  },
+  "risk": {
+    "cornish_fisher_var": 0.034896547592652864,
+    "gaussian_cvar": 0.04037630198665226,
+    "gaussian_var": 0.032018388478067095,
+    "historical_cvar": 0.051536998762067535,
+    "historical_var": 0.02090995527960678
+  },
+  "schema_version": 1
+}

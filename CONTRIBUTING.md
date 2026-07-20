@@ -2,12 +2,11 @@
 
 ## Development setup
 
-Use Python 3.10 or newer in an isolated virtual environment:
+Use Python 3.10 through 3.13 and uv 0.11.16. Create the exact locked
+development environment with:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[dev,app]"
+uv sync --locked --extra app --extra dev
 ```
 
 Do not commit environment files, API caches, downloaded data, generated
@@ -18,8 +17,8 @@ outputs, credentials, or private portfolio information.
 Run the regression suite without pytest or bytecode caches:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python -m pytest \
-  -p no:cacheprovider --disable-warnings -q
+PYTHONDONTWRITEBYTECODE=1 uv run --locked --no-sync python -m pytest \
+  -p no:cacheprovider -q
 ```
 
 Changes to return conventions, horizons, VaR/CVaR, backtesting, simulations,
@@ -31,14 +30,27 @@ and an explicit explanation of their financial-behavior impact.
 Run the same local gates used by CI:
 
 ```bash
-ruff check app.py run_demo.py run_phase5_optimization_demo.py src tests
-python -m pytest -p no:cacheprovider -q \
+uv lock --check
+uv run --locked --no-sync ruff check \
+  app.py run_demo.py run_phase5_optimization_demo.py src tests scripts
+uv run --locked --no-sync python -m pytest -p no:cacheprovider -q \
   --cov=var_cvar_crypto_risk --cov-fail-under=68
-python -m build
+uv run --locked --no-sync python -m build --no-isolation
 ```
 
 `pyproject.toml` is the dependency source of truth. Do not add independent
-version lists to the compatibility requirements files.
+version lists to the compatibility requirements files. Dependency changes must
+update `uv.lock` in the same focused pull request.
+
+If an intentional formula or dependency change affects the numerical golden
+test, print the candidate baseline first:
+
+```bash
+uv run --locked --no-sync python -m scripts.generate_numerical_baseline
+```
+
+Use `--write` only after reviewing and explaining every material numerical
+change. Never refresh the golden file merely to make CI pass.
 
 ## Pull requests
 
