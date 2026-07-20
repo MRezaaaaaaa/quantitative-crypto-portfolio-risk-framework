@@ -1,12 +1,4 @@
-pandas>=2.0
-numpy>=1.25
-scipy>=1.11
-matplotlib>=3.7
-requests>=2.31
-PyYAML>=6.0
-yfinance>=0.2.36
-python-dotenv>=1.0
-streamlit>=1.32
-cvxpy>=1.4
-pytest>=7.4
-pytest-cov>=4.1
+# Compatibility entry point for application/deployment environments that expect
+# a requirements.txt file. Dependency versions are defined only in
+# pyproject.toml.
+-e .[app]

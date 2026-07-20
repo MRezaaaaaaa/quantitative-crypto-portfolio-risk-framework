@@ -1,0 +1,3 @@
+# Local development and CI compatibility entry point.
+# Dependency versions are defined only in pyproject.toml.
+-e .[app,dev]

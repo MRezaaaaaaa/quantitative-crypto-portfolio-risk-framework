@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
 
 from var_cvar_crypto_risk.backtesting import (
     calculate_rolling_breach_rate,

@@ -165,6 +165,9 @@ package version, and random seed.
 
 See [Reproducibility](docs/reproducibility.md).
 
+Dependency declarations and the remaining lockfile decision are documented in
+[Dependency management](docs/dependency-management.md).
+
 ## Known limitations
 
 - Historical crypto returns are non-stationary and may not represent the next
@@ -207,6 +210,7 @@ See [CHANGELOG](CHANGELOG.md) and the specifications under `openspec/`.
 - [Model risk](docs/model-risk.md)
 - [Data provenance](docs/data-provenance.md)
 - [Reproducibility](docs/reproducibility.md)
+- [Dependency management](docs/dependency-management.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 

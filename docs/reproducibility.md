@@ -68,9 +68,13 @@ actual data cutoff and should not be presented as exactly reproducible.
 
 Before `v1.0.0`, add:
 
-- tested dependency constraints or a lock strategy;
+- a reviewed cross-platform lock strategy based on `pyproject.toml`;
 - wheel and source-distribution installation checks;
-- CI across supported Python versions;
 - a synthetic or redistribution-approved article fixture;
 - golden numerical outputs with explicit tolerances;
 - a manifest generator for publication artifacts.
+
+CI now performs clean installation and regression tests on Python 3.10 through
+3.13, plus lint, coverage, build, and Streamlit startup checks. These gates test
+compatibility against the declared dependency ranges; they do not replace a
+pinned research environment.

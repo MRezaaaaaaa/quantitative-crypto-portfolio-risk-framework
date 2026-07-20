@@ -11,6 +11,11 @@ Versioning when it reaches a public release.
 - Repository governance and release-hygiene files.
 - Focused architecture, methodology, model-risk, data-provenance, and
   reproducibility documentation.
+- Centralized dependency declarations and compatibility requirement entry
+  points.
+- GitHub Actions CI for the supported Python matrix, lint, coverage, package
+  build, and Streamlit startup checks.
+- Dependabot configuration for Python and GitHub Actions dependencies.
 
 ### Changed
 
@@ -18,6 +23,8 @@ Versioning when it reaches a public release.
 - Corrected release-blocking README phase and feature contradictions.
 - Replaced the phase-by-phase README log with a current product overview and
   qualified unsupported regulatory and model-performance claims.
+- Removed unused imports and one redundant f-string to establish the initial
+  lint baseline without changing financial behavior.
 
 ## [0.5.0] - 2026-07-19
 

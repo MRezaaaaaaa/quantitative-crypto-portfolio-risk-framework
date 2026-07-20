@@ -41,7 +41,6 @@ from var_cvar_crypto_risk.assumptions import (  # noqa: E402
     AssumptionConfig,
     build_assumption_table,
     build_volatility_table,
-    estimate_covariance_robust,
 )
 from var_cvar_crypto_risk.correlation import (  # noqa: E402
     calculate_correlation_matrix,
@@ -2115,7 +2114,7 @@ with tab_mc:
         st.pyplot(fig_dist, use_container_width=True)
         dist_file_tag = "compare" if dist == "compare" else dist
         st.download_button(
-            f"⬇️ Download MC distribution chart (PNG)",
+            "⬇️ Download MC distribution chart (PNG)",
             data=_fig_to_png_bytes(fig_dist),
             file_name=f"mc_loss_distribution_{dist_file_tag}.png",
             mime="image/png",

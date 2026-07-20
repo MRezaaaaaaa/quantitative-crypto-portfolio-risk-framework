@@ -26,6 +26,20 @@ Changes to return conventions, horizons, VaR/CVaR, backtesting, simulations,
 covariance estimation, optimization, or solver handling require focused tests
 and an explicit explanation of their financial-behavior impact.
 
+## Quality checks
+
+Run the same local gates used by CI:
+
+```bash
+ruff check app.py run_demo.py run_phase5_optimization_demo.py src tests
+python -m pytest -p no:cacheprovider -q \
+  --cov=var_cvar_crypto_risk --cov-fail-under=68
+python -m build
+```
+
+`pyproject.toml` is the dependency source of truth. Do not add independent
+version lists to the compatibility requirements files.
+
 ## Pull requests
 
 Keep changes narrowly scoped. Describe the root cause, implementation, tests,

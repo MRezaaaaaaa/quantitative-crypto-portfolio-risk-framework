@@ -28,7 +28,6 @@ Step 3 (Monte Carlo scenario engine):
 
 from __future__ import annotations
 
-import json
 import sys
 import traceback
 from pathlib import Path
@@ -62,7 +61,6 @@ from var_cvar_crypto_risk.export import (  # noqa: E402
 from var_cvar_crypto_risk.monte_carlo import (  # noqa: E402
     calculate_portfolio_scenario_returns,
     compare_all_risk_methods,
-    compare_monte_carlo_distributions,
     estimate_return_parameters,
     monte_carlo_risk_summary,
     scenario_cvar,
