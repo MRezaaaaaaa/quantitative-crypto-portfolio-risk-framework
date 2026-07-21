@@ -1,0 +1,80 @@
+schema_version: 1
+
+experiment:
+  id: "methodology-demo-v1"
+  title: "VaR, CVaR, Backtesting, and Minimum-CVaR Optimization"
+  purpose: "Deterministic synthetic-data methodology demonstration"
+  claims_boundary: "synthetic_methodology_only"
+
+data:
+  source: "local_csv"
+  path: "tests/fixtures/synthetic_daily_prices.csv"
+  expected_sha256: "2bab3fd42995c5c53aa33b3f56031591823b2800afb62d3fe6641f0f6b132cd8"
+  date_column: "Date"
+  cutoff_date: "2024-03-31"
+  frequency: "daily"
+  dataset_type: "project_generated_synthetic"
+  license: "Repository MIT license"
+  attribution: "Synthetic fixture generated for this project"
+
+portfolio:
+  initial_capital: 100000.0
+  weights:
+    BTC: 0.50
+    ETH: 0.30
+    SOL: 0.20
+
+returns:
+  method: "simple"
+  periods_per_year: 365
+
+risk:
+  confidence_level: 0.95
+  var_methods:
+    - historical
+    - gaussian
+    - cornish_fisher
+  cvar_methods:
+    - historical
+    - gaussian
+
+assumptions:
+  expected_return_method: "trimmed_mean"
+  expected_return_horizon_days: 7
+  trim_proportion: 0.10
+  winsor_proportion: 0.10
+  shrinkage_weight: 0.50
+  covariance_method: "ewma"
+  covariance_frequency: "daily"
+  ewma_lambda: 0.92
+  shrinkage_delta: 0.20
+  shrinkage_target: "constant_correlation"
+
+backtesting:
+  method: "gaussian"
+  window: 40
+  horizon_days: 1
+  mode: "non_overlapping"
+
+optimization:
+  objective: "minimum_cvar"
+  scenario_source: "historical"
+  horizon_days: 7
+  long_only: true
+  min_weight: 0.0
+  max_weight: 0.80
+  solver: null
+  interpretation: "in_sample_methodology_demo"
+
+publication:
+  decimal_places: 8
+  article_mapping:
+    risk_summary.csv: "Risk Summary"
+    expected_returns.csv: "Robust Assumptions"
+    covariance.csv: "Robust Assumptions"
+    backtesting_forecasts.csv: "Backtesting"
+    backtesting_summary.csv: "Backtesting"
+    allocation_comparison.csv: "Optimization"
+    portfolio_comparison.csv: "Optimization"
+    var_cvar_comparison.svg: "Risk Summary"
+    allocation_comparison.svg: "Optimization"

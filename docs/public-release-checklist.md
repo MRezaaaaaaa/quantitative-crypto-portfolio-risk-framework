@@ -72,6 +72,10 @@ repositories. Do not claim it is active until a pull request run completes.
 
 ## 4. Research-publication gate
 
+The repository includes a completed synthetic methodology workflow and
+manifest generator. The boxes below remain article-specific: check them again
+for the exact dataset, config, commit, and claims used by each publication.
+
 - [ ] Pin a legally redistributable input dataset and record its hash.
 - [ ] Record configuration, data cutoff, dependency-lock hash, Git commit,
       random seeds, solver, and covariance/constraint governance diagnostics.

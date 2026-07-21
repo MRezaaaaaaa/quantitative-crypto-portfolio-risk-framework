@@ -31,6 +31,8 @@ performance.
   constraint residuals instead of trusting solver status alone.
 - Enforces a local public/private publication boundary and defines pinned
   CodeQL and dependency-review workflows for the future GitHub remote.
+- Generates and verifies deterministic offline publication bundles with pinned
+  inputs, assumptions, cutoffs, source revisions, and artifact hashes.
 - Exposes assumptions and diagnostics through an interactive Streamlit app.
 - Applies a centralized return policy: Simple for portfolio/NAV/scenario/
   optimization calculations, with Log available only for advanced distribution
@@ -134,6 +136,7 @@ technical debt.
 ├── notebooks/
 ├── openspec/                     # specifications and historical change records
 ├── outputs/                      # generated results; ignored
+├── publication/                  # reproducible article experiments
 ├── scripts/                      # explicit maintenance utilities
 ├── src/var_cvar_crypto_risk/
 ├── tests/
@@ -170,9 +173,21 @@ Numerical acceptance rules are defined in
 
 ## Reproducing results
 
-Generated outputs are intentionally not committed. To recreate them, install
-the project, review the YAML configurations, then run the command-line demo or
-the relevant Streamlit workflow.
+General demo outputs are intentionally not committed. For a reviewed,
+deterministic article workflow, generate the synthetic methodology bundle:
+
+```bash
+uv run --locked --no-sync python -m scripts.reproduce_publication \
+  --config publication/configs/methodology_demo_v1.yaml \
+  --output-dir publication/artifacts/methodology-demo-v1
+```
+
+The runner requires a clean Git tree, runs offline, checks the input hash and
+cutoff, records solver diagnostics, and writes a manifest containing hashes for
+every table and figure. See the
+[publication experiment guide](publication/README.md). The bundled fixture is
+synthetic; its outputs illustrate methodology and must not be reported as
+real-market performance, prediction accuracy, or an investable strategy.
 
 A live vendor run is not perfectly reproducible because upstream data can be
 revised and the end date can move. Publication-quality results require a pinned,
@@ -217,7 +232,9 @@ before `v1.0.0` includes:
 - exercising the configured CI workflow on the future public GitHub remote;
 - exercising the security workflows and enabling remote-only Secret Scanning,
   Push Protection, Private Vulnerability Reporting, and branch rules;
-- adding a publication dataset and artifact-manifest workflow.
+- selecting a legally redistributable real-market dataset if future articles
+  make market-specific empirical claims. The current publication workflow is a
+  synthetic methodology demonstration only.
 
 The local and CI test suites enforce an 80% package coverage floor. Coverage is
 a regression guard, not evidence that the financial models are correct.
@@ -236,6 +253,7 @@ See [CHANGELOG](CHANGELOG.md) and the specifications under `openspec/`.
 - [Reproducibility](docs/reproducibility.md)
 - [Dependency management](docs/dependency-management.md)
 - [Public release checklist](docs/public-release-checklist.md)
+- [Reproducible publication experiments](publication/README.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 

@@ -13,9 +13,11 @@ The project distinguishes three levels:
    and regenerate every table or figure used in an article.
 
 Version 0.5.0 establishes a tested code baseline, a cross-platform dependency
-lock, and a deterministic synthetic numerical baseline. A pinned article
-dataset and publication-artifact manifest are still required for full research
-reproducibility.
+lock, a deterministic synthetic numerical baseline, and a config-driven
+publication workflow. The included experiment provides research
+reproducibility for a synthetic methodology demonstration. A separately
+licensed, pinned real-market dataset is still required before making empirical
+claims about crypto-market behavior or performance.
 
 ## Current workflow
 
@@ -69,10 +71,27 @@ cause is an intended formula change, a dependency update, a tolerance problem,
 or a regression. The numerical baseline tests code stability; it does not
 validate model accuracy or future risk forecasts.
 
-## Recording an experiment
+## Reproducible publication experiment
 
-For a result intended for GitHub, Medium, or LinkedIn, save an external manifest
-containing:
+The repository-local `methodology-demo-v1` experiment freezes a synthetic input
+hash, cutoff, portfolio, return convention, estimator settings, backtest,
+optimizer constraints, and article-to-app mapping. Generate it only from a
+clean reviewed commit:
+
+```bash
+uv run --locked --no-sync python -m scripts.reproduce_publication \
+  --config publication/configs/methodology_demo_v1.yaml \
+  --output-dir publication/artifacts/methodology-demo-v1
+```
+
+Then verify it:
+
+```bash
+uv run --locked --no-sync python -m scripts.reproduce_publication \
+  --verify publication/artifacts/methodology-demo-v1/manifest.json
+```
+
+The generated manifest records:
 
 ```text
 experiment_id
@@ -97,17 +116,29 @@ solver, raw solver status, residual tolerance, and maximum violation
 output file hashes
 ```
 
+Generation refuses a dirty tree by default. `--allow-dirty` is a preview-only
+escape hatch and must not be used for article artifacts. Verification detects
+changes to calculation sources, the config, dependency lock, dataset, cutoff,
+Git commit, and generated artifacts. It verifies provenance and integrity, not
+economic validity.
+
+See [Reproducible publication experiments](../publication/README.md) for the
+claims boundary and article workflow.
+
 ## Live-data limitation
 
 When `end_date` is unset, a later execution consumes a later sample. Vendors can
 also revise observations. Screenshots from live data must therefore display the
 actual data cutoff and should not be presented as exactly reproducible.
 
-## Planned release controls
+## Remaining research-publication control
 
-Before `v1.0.0`, add:
-
-- a manifest generator for publication artifacts.
+The synthetic workflow is complete. Before a real-market article, select a
+dataset whose license explicitly permits the intended redistribution and use,
+record its attribution and hash, choose a point-in-time asset universe, and
+separate estimation from out-of-sample evaluation. Replacing synthetic prices
+with vendor data without those controls would create licensing, survivorship,
+and look-ahead risks.
 
 The complete local and GitHub-hosted publication gates are listed in the
 [public release checklist](public-release-checklist.md).

@@ -8,6 +8,14 @@ Versioning when it reaches a public release.
 
 ### Added
 
+- Deterministic offline publication workflow with a pinned synthetic dataset,
+  cutoff enforcement, experiment config, article-to-app mapping, and
+  reproducible CSV/SVG outputs.
+- Publication artifact manifest recording source, dependency-lock, config,
+  dataset, solver-validation, bias-control, and output hashes, plus a strict
+  verification command.
+- Publication controls that reject dirty-tree production runs, unreviewed data
+  hashes, unexpected output-directory files, and non-simple optimization input.
 - Pinned CodeQL and Dependency Review workflows with least-privilege job
   permissions and explicit timeouts.
 - Tested public/private repository-boundary scanner integrated into CI.

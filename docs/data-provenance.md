@@ -50,6 +50,22 @@ sample dataset is committed, verify the provider's current terms. When rights
 are uncertain, publish a download/reproduction script and metadata rather than
 the vendor data itself.
 
+## Included publication dataset
+
+`tests/fixtures/synthetic_daily_prices.csv` is project-generated synthetic
+data covered by the repository license. The publication config pins its
+SHA-256 digest and cutoff before calculation. It is suitable for demonstrating
+the VaR/CVaR, backtesting, robust-assumption, and optimization workflow, but it
+cannot support claims about actual crypto returns, forecasting performance, or
+investment suitability.
+
+The default publication workflow does not redistribute CoinGecko payloads.
+Coin Metrics community data is also not bundled as the default because its
+CC BY-NC license may conflict with later commercial or promotional reuse. A
+future real-data experiment must record the exact source license, attribution,
+download procedure, identifiers, and point-in-time universe before its outputs
+are published.
+
 ## Private data
 
 Never commit real holdings, transactions, account identifiers, client records,
