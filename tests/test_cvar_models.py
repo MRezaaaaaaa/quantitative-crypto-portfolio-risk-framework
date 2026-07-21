@@ -47,3 +47,10 @@ def test_invalid_confidence_raises(long_returns: pd.Series, bad_conf: float) -> 
 def test_calculate_cvar_unknown_method_raises(long_returns: pd.Series) -> None:
     with pytest.raises(ValueError):
         calculate_cvar(long_returns, method="bogus", confidence_level=0.95)
+
+
+def test_cvar_models_reject_insufficient_samples() -> None:
+    with pytest.raises(ValueError, match="Historical CVaR"):
+        historical_cvar(pd.Series(dtype=float))
+    with pytest.raises(ValueError, match="at least 2"):
+        gaussian_cvar(pd.Series([0.01]))

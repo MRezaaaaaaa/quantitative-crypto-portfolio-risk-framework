@@ -95,7 +95,7 @@ jobs:
           uv run --locked --no-sync python -m pytest -p no:cacheprovider -q \
             --cov=var_cvar_crypto_risk \
             --cov-report=term-missing \
-            --cov-fail-under=68
+            --cov-fail-under=80
 
       - name: Build wheel and source distribution
         run: uv run --locked --no-sync python -m build --no-isolation

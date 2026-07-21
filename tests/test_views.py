@@ -54,3 +54,8 @@ def test_invalid_blend_weight_raises() -> None:
         apply_manual_expected_return_views(
             _base(), [AssetReturnView("BTC", 0.01)], blend_weight=1.5
         )
+
+
+def test_views_require_series_base() -> None:
+    with pytest.raises(ValueError, match="pd.Series"):
+        apply_manual_expected_return_views({"BTC": 0.01}, [])

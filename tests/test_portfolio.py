@@ -9,6 +9,7 @@ import pytest
 from var_cvar_crypto_risk.portfolio import (
     calculate_portfolio_returns,
     calculate_portfolio_value,
+    get_weights_from_config,
     normalize_weights,
     validate_weights,
 )
@@ -51,6 +52,44 @@ def test_normalize_weights_sums_to_one() -> None:
     raw = pd.Series({"BTC": 2.0, "ETH": 3.0, "SOL": 5.0})
     normalized = normalize_weights(raw)
     assert abs(float(normalized.sum()) - 1.0) < 1e-12
+
+
+def test_get_weights_from_config_uses_zero_for_missing_weight() -> None:
+    weights = get_weights_from_config(
+        {"assets": {"BTC": {"weight": 0.75}, "ETH": {}}}
+    )
+    expected = pd.Series({"BTC": 0.75, "ETH": 0.0}, dtype=float)
+    pd.testing.assert_series_equal(weights, expected)
+
+
+def test_validate_weights_reports_missing_and_extra_assets() -> None:
+    weights = pd.Series({"BTC": 0.5, "DOGE": 0.5})
+    with pytest.raises(ValueError, match="Missing.*ETH.*Extra.*DOGE"):
+        validate_weights(weights, ["BTC", "ETH"])
+
+
+def test_normalize_weights_rejects_zero_sum() -> None:
+    with pytest.raises(ValueError, match="sum to zero"):
+        normalize_weights(pd.Series({"BTC": 1.0, "ETH": -1.0}))
+
+
+def test_portfolio_returns_require_every_asset_weight() -> None:
+    returns = pd.DataFrame({"BTC": [0.01], "ETH": [0.02]})
+    with pytest.raises(ValueError, match="Weights missing.*ETH"):
+        calculate_portfolio_returns(returns, pd.Series({"BTC": 1.0}))
+
+
+def test_log_portfolio_rejects_nonpositive_reconstructed_gross_return() -> None:
+    simple = pd.DataFrame({"A": [-0.75], "B": [1.0]})
+    log_returns = np.log1p(simple)
+    leveraged_weights = pd.Series({"A": 2.0, "B": -1.0})
+
+    with pytest.raises(ValueError, match="simple portfolio return is <= -1"):
+        calculate_portfolio_returns(
+            log_returns,
+            leveraged_weights,
+            return_method="log",
+        )
 
 
 def test_portfolio_returns_index_matches_input(

@@ -42,7 +42,7 @@ testpaths = ["tests"]
 source = ["var_cvar_crypto_risk"]
 
 [tool.coverage.report]
-fail_under = 68
+fail_under = 80
 show_missing = true
 skip_covered = true
 

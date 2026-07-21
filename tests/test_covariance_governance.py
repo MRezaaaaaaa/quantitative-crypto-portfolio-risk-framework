@@ -72,6 +72,59 @@ def test_covariance_governance_rejects_invalid_labels_and_values() -> None:
         prepare_covariance_matrix(nonfinite)
 
 
+@pytest.mark.parametrize(
+    ("covariance", "message"),
+    [
+        (np.eye(2), "pandas DataFrame"),
+        (pd.DataFrame(), "empty"),
+        (pd.DataFrame([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]), "square"),
+        (
+            pd.DataFrame(
+                [[1.0, 0.0], [0.0, 1.0]],
+                index=["A", "A"],
+                columns=["A", "A"],
+            ),
+            "unique",
+        ),
+    ],
+)
+def test_covariance_governance_rejects_invalid_frame_contracts(
+    covariance,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        covariance_diagnostics(covariance)
+
+
+def test_covariance_governance_rejects_invalid_numerical_controls() -> None:
+    covariance = pd.DataFrame([[1.0]], index=["A"], columns=["A"])
+    with pytest.raises(ValueError, match="tolerance must be"):
+        covariance_diagnostics(covariance, tolerance=0.0)
+    with pytest.raises(ValueError, match="policy must be"):
+        prepare_covariance_matrix(covariance, policy="clip")
+    with pytest.raises(ValueError, match="eigenvalue_floor"):
+        prepare_covariance_matrix(covariance, eigenvalue_floor=0.0)
+
+
+def test_covariance_governance_rejects_negative_variance() -> None:
+    covariance = pd.DataFrame([[-1.0]], index=["A"], columns=["A"])
+    with pytest.raises(ValueError, match="negative variance"):
+        prepare_covariance_matrix(covariance)
+
+
+def test_covariance_repair_reports_asymmetry_reason() -> None:
+    covariance = pd.DataFrame(
+        [[1.0, 0.8], [0.2, 1.0]],
+        index=["A", "B"],
+        columns=["A", "B"],
+    )
+    repaired, report = prepare_covariance_matrix(covariance)
+
+    assert report["repaired"] is True
+    assert "asymmetry" in report["reasons"]
+    np.testing.assert_allclose(repaired, repaired.T)
+
+
 def test_monte_carlo_attaches_covariance_repair_report() -> None:
     scenarios = simulate_normal_returns(
         mean_vector=pd.Series({"A": 0.0, "B": 0.0}),

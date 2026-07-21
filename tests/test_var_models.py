@@ -55,3 +55,14 @@ def test_calculate_var_unknown_method_raises(long_returns: pd.Series) -> None:
 def test_scale_var_to_horizon_uses_sqrt_of_time() -> None:
     scaled = scale_var_to_horizon(0.04, 10)
     assert math.isclose(scaled, 0.04 * math.sqrt(10), rel_tol=1e-12)
+
+
+def test_var_models_reject_insufficient_samples() -> None:
+    with pytest.raises(ValueError, match="Historical VaR"):
+        historical_var(pd.Series(dtype=float))
+    with pytest.raises(ValueError, match="at least 2"):
+        gaussian_var(pd.Series([0.01]))
+    with pytest.raises(ValueError, match="at least 4"):
+        cornish_fisher_var(pd.Series([0.01, -0.01, 0.02]))
+    with pytest.raises(ValueError, match="horizon_days"):
+        scale_var_to_horizon(0.02, 0)

@@ -45,6 +45,11 @@ Versioning when it reaches a public release.
   backtesting outputs.
 - Source-distribution manifest containing the documentation, configuration,
   maintenance scripts, complete test support files, and synthetic fixtures.
+- Offline data-boundary tests covering configuration, preprocessing, CSV
+  validation, CoinGecko retry/cache behavior, yfinance response shapes, and
+  provider fallback without live API calls.
+- Contract tests for portfolio weights, return horizons, covariance and
+  correlation validation, and insufficient-sample VaR/CVaR failures.
 
 ### Changed
 
@@ -72,6 +77,7 @@ Versioning when it reaches a public release.
   lint baseline without changing financial behavior.
 - Switched CI installation and execution to the committed uv lockfile.
 - Aligned the declared Python support window with the tested 3.10–3.13 matrix.
+- Raised the enforced package coverage floor from 68% to 80%.
 
 ## [0.5.0] - 2026-07-19
 

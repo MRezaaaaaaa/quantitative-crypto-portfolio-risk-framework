@@ -35,7 +35,7 @@ uv run --locked --no-sync ruff check \
   app.py run_demo.py run_phase5_optimization_demo.py src tests scripts
 uv run --locked --no-sync python -m scripts.check_public_boundary
 uv run --locked --no-sync python -m pytest -p no:cacheprovider -q \
-  --cov=var_cvar_crypto_risk --cov-fail-under=68
+  --cov=var_cvar_crypto_risk --cov-fail-under=80
 uv run --locked --no-sync python -m build --no-isolation
 ```
 

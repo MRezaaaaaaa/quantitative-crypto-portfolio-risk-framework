@@ -217,8 +217,10 @@ before `v1.0.0` includes:
 - exercising the configured CI workflow on the future public GitHub remote;
 - exercising the security workflows and enabling remote-only Secret Scanning,
   Push Protection, Private Vulnerability Reporting, and branch rules;
-- raising coverage from the current 68% floor toward 80%;
 - adding a publication dataset and artifact-manifest workflow.
+
+The local and CI test suites enforce an 80% package coverage floor. Coverage is
+a regression guard, not evidence that the financial models are correct.
 
 See [CHANGELOG](CHANGELOG.md) and the specifications under `openspec/`.
 

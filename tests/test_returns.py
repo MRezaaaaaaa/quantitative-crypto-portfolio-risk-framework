@@ -41,6 +41,14 @@ def test_calculate_returns_no_nan(sample_prices: pd.DataFrame) -> None:
     assert len(rets) == len(sample_prices) - 1
 
 
+def test_calculate_returns_log_dispatch_matches_direct(
+    sample_prices: pd.DataFrame,
+) -> None:
+    actual = calculate_returns(sample_prices, method="log")
+    expected = calculate_log_returns(sample_prices)
+    pd.testing.assert_frame_equal(actual, expected)
+
+
 def test_calculate_returns_unknown_method_raises(sample_prices: pd.DataFrame) -> None:
     with pytest.raises(ValueError):
         calculate_returns(sample_prices, method="bogus")
@@ -96,6 +104,44 @@ def test_horizon_returns_log_matches_sum(sample_portfolio_returns: pd.Series) ->
     out = calculate_horizon_returns(clean, horizon_days=h, method="log", overlapping=True)
     expected_first = float(np.sum(clean.to_numpy()[:h]))
     assert out.iloc[0] == pytest.approx(expected_first)
+
+
+def test_horizon_returns_non_overlapping_log_uses_block_sums() -> None:
+    log_returns = pd.Series(
+        [0.01, -0.02, 0.03, 0.04, 0.05],
+        index=pd.date_range("2024-01-01", periods=5),
+    )
+    actual = calculate_horizon_returns(
+        log_returns,
+        horizon_days=2,
+        method="log",
+        overlapping=False,
+    )
+    expected = pd.Series(
+        [-0.01, 0.07],
+        index=[pd.Timestamp("2024-01-02"), pd.Timestamp("2024-01-04")],
+        name="horizon_2d_return",
+    )
+    pd.testing.assert_series_equal(actual, expected)
+
+
+@pytest.mark.parametrize(
+    ("returns", "horizon", "method", "message"),
+    [
+        (pd.DataFrame({"r": [0.01]}), 1, "simple", "pd.Series"),
+        (pd.Series([0.01]), 0, "simple", "horizon_days"),
+        (pd.Series([0.01]), 1, "arithmetic", "Unknown method"),
+        (pd.Series([0.01]), 2, "simple", "Need at least"),
+    ],
+)
+def test_horizon_returns_rejects_invalid_contracts(
+    returns,
+    horizon: int,
+    method: str,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        calculate_horizon_returns(returns, horizon, method=method)
 
 
 def test_cumulative_returns_dataframe_preserves_columns(sample_returns: pd.DataFrame) -> None:
