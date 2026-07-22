@@ -18,12 +18,18 @@ repository is not evidence that the workflow has run successfully.
 - [ ] Streamlit starts and its health endpoint responds.
 - [ ] Every relative Markdown link resolves.
 - [ ] `python -m scripts.check_public_boundary` passes.
+- [ ] `python -m scripts.check_git_history_boundary` passes across every local
+      ref intended for the first public push.
 
 The local boundary check scans tracked and non-ignored untracked files for
 forbidden private artifact paths, common credential shapes, private-key
 headers, and local user paths. It deliberately reports no matched value. It is
 a defense-in-depth policy check, not a substitute for GitHub Secret Scanning or
 a reviewed history scan.
+
+The history check applies the same path/content rules to blobs reachable from
+all local refs and rejects local-only commit email domains. Run it before the
+first public push and again after any history rewrite.
 
 ## 2. Public/private boundary
 

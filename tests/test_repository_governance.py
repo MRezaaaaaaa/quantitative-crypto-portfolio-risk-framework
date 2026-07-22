@@ -44,9 +44,11 @@ def test_security_workflow_scopes_security_events_to_codeql_job() -> None:
     assert "actions/dependency-review-action@" in text
 
 
-def test_ci_runs_public_boundary_check() -> None:
+def test_ci_runs_public_boundary_checks_with_full_history() -> None:
     text = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
     assert "python -m scripts.check_public_boundary" in text
+    assert "python -m scripts.check_git_history_boundary" in text
+    assert text.count("fetch-depth: 0") == 2
 
 
 def test_issue_forms_are_parseable_and_disable_blank_issues() -> None:

@@ -133,7 +133,6 @@ technical debt.
 ├── configs/
 ├── data/                         # local data and cache; ignored
 ├── docs/
-├── notebooks/
 ├── openspec/                     # specifications and historical change records
 ├── outputs/                      # generated results; ignored
 ├── publication/                  # reproducible article experiments

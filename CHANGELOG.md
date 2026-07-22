@@ -8,6 +8,9 @@ Versioning when it reaches a public release.
 
 ### Added
 
+- Pre-publication Git-history scanner covering deleted private paths, secret-
+  shaped content, external symlinks, oversized historical files, and local-only
+  commit identities without printing matched values.
 - Deterministic offline publication workflow with a pinned synthetic dataset,
   cutoff enforcement, experiment config, article-to-app mapping, and
   reproducible CSV/SVG outputs.
@@ -86,6 +89,13 @@ Versioning when it reaches a public release.
 - Switched CI installation and execution to the committed uv lockfile.
 - Aligned the declared Python support window with the tested 3.10–3.13 matrix.
 - Raised the enforced package coverage floor from 68% to 80%.
+
+### Removed
+
+- Stale generated HTML guide containing superseded phase/version claims and
+  oversimplified statistical-test interpretations.
+- Placeholder validation notebook that contained no reproducible analysis and
+  was not part of the supported publication workflow.
 
 ## [0.5.0] - 2026-07-19
 
