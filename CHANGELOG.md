@@ -64,6 +64,9 @@ Versioning when it reaches a public release.
 
 ### Changed
 
+- Archived the completed legacy OpenSpec change records under the official
+  date-prefixed `openspec/changes/archive/` convention without rewriting the
+  already-established current specifications.
 - Replaced the global Streamlit Simple/Log switch with Automatic handling and
   an Advanced diagnostic-only convention selector. Core portfolio, NAV,
   backtesting, Monte Carlo, and optimization workflows now always use Simple
