@@ -64,6 +64,9 @@ Versioning when it reaches a public release.
 
 ### Changed
 
+- Migrated active OpenSpec capabilities from legacy flat Markdown files to the
+  validated `openspec/specs/<capability>/spec.md` requirement-and-scenario
+  structure.
 - Renamed the public project and distribution to **Quantitative Crypto
   Portfolio Risk Framework** while preserving the stable
   `var_cvar_crypto_risk` Python import namespace.

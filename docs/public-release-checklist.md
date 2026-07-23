@@ -13,6 +13,8 @@ repository is not evidence that the workflow has run successfully.
 - [ ] Full tests and the numerical golden baseline pass.
 - [ ] Coverage meets the current floor and does not materially regress.
 - [ ] Ruff and `git diff --check` pass.
+- [ ] `openspec validate --all --strict --no-interactive` passes with every
+      active capability discovered by `openspec list --specs`.
 - [ ] Wheel and source distribution build without dependency resolution.
 - [ ] The built wheel imports in a clean environment.
 - [ ] Streamlit starts and its health endpoint responds.
