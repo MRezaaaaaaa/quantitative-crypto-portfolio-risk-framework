@@ -87,7 +87,7 @@ jobs:
       - name: Lint
         run: >-
           uv run --locked --no-sync ruff check
-          app.py run_demo.py run_phase5_optimization_demo.py src tests scripts
+          app.py src tests scripts
 
       - name: Verify public/private repository boundary
         run: uv run --locked --no-sync python -m scripts.check_public_boundary

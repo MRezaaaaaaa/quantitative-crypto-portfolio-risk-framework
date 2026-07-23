@@ -98,8 +98,8 @@ historical and parametric estimates in one table.
    `simulate_normal_returns(horizon_days=1)` for the same seed.
 6. `compare_all_risk_methods` includes all five methods and a
    `Horizon Days` column.
-7. All required tables and charts are produced by
-   `python run_demo.py`.
+7. The focused Monte Carlo and plotting tests cover the required scenario,
+   comparison, path, table, and chart interfaces without live API calls.
 
 ## Future extension points
 

@@ -64,18 +64,6 @@ Run the Streamlit application:
 uv run --locked --no-sync streamlit run app.py
 ```
 
-Run the command-line analysis pipeline:
-
-```bash
-uv run --locked --no-sync python run_demo.py
-```
-
-Run the optimization demo:
-
-```bash
-uv run --locked --no-sync python run_phase5_optimization_demo.py
-```
-
 Run the regression suite without writing bytecode or pytest cache files:
 
 ```bash
@@ -139,8 +127,6 @@ technical debt.
 ├── scripts/                      # explicit maintenance utilities
 ├── src/var_cvar_crypto_risk/
 ├── tests/
-├── run_demo.py
-├── run_phase5_optimization_demo.py
 └── pyproject.toml
 ```
 

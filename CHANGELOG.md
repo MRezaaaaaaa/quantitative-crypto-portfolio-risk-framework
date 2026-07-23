@@ -92,6 +92,9 @@ Versioning when it reaches a public release.
 
 ### Removed
 
+- Legacy root-level CLI demo scripts that duplicated Streamlit orchestration,
+  depended on live data, and were superseded by the deterministic publication
+  workflow.
 - Stale generated HTML guide containing superseded phase/version claims and
   oversimplified statistical-test interpretations.
 - Placeholder validation notebook that contained no reproducible analysis and

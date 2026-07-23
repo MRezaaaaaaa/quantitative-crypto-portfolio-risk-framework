@@ -56,8 +56,7 @@ Run commands without allowing an implicit lock update:
 
 ```bash
 uv run --locked --no-sync python -m pytest -p no:cacheprovider -q
-uv run --locked --no-sync ruff check app.py run_demo.py \
-  run_phase5_optimization_demo.py src tests scripts
+uv run --locked --no-sync ruff check app.py src tests scripts
 ```
 
 `uv lock --check` is the mechanical gate that confirms the lock still matches

@@ -8,7 +8,6 @@ parent directories.
 
 from __future__ import annotations
 
-import importlib
 import subprocess
 import sys
 import textwrap
@@ -77,20 +76,6 @@ def test_backtesting_import_without_yfinance() -> None:
         f"Subprocess failed.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
     )
     assert "OK" in result.stdout
-
-
-def test_demo_script_imports() -> None:
-    """The unified demo script must be importable as a module (its
-    imports resolve) without executing ``main``."""
-    demo_path = PROJECT_ROOT / "run_demo.py"
-    assert demo_path.exists(), f"Missing demo script: {demo_path}"
-
-    spec = importlib.util.spec_from_file_location("run_demo", str(demo_path))
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    assert hasattr(module, "main")
-    assert callable(module.main)
 
 
 def test_export_creates_parent_dirs(tmp_path: Path) -> None:

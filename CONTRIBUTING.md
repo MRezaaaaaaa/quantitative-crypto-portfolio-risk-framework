@@ -32,7 +32,7 @@ Run the same local gates used by CI:
 ```bash
 uv lock --check
 uv run --locked --no-sync ruff check \
-  app.py run_demo.py run_phase5_optimization_demo.py src tests scripts
+  app.py src tests scripts
 uv run --locked --no-sync python -m scripts.check_public_boundary
 uv run --locked --no-sync python -m scripts.check_git_history_boundary
 uv run --locked --no-sync python -m pytest -p no:cacheprovider -q \

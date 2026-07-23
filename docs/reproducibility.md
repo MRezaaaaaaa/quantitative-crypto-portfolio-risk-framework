@@ -28,13 +28,10 @@ PYTHONDONTWRITEBYTECODE=1 uv run --locked --no-sync python -m pytest \
   -p no:cacheprovider -q
 
 uv run --locked --no-sync python -m scripts.check_public_boundary
-
-uv run --locked --no-sync python run_demo.py
-uv run --locked --no-sync python run_phase5_optimization_demo.py
 ```
 
-Generated files are written beneath `outputs/` and intentionally ignored by
-Git.
+Use the Streamlit application for interactive analysis. Use the publication
+workflow below when deterministic, reviewable article artifacts are required.
 
 ## Numerical golden baseline
 

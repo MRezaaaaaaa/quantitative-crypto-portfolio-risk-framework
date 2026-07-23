@@ -34,9 +34,9 @@ or balance the two along an efficient frontier.
 * Streamlit UI tab with scenario, objective, and constraint controls;
   KPI cards; weights tables and charts; comparison and frontier
   visualisations; downloadable CSV / PNG artefacts.
-* Command-line demo `run_phase5_optimization_demo.py`.
-* OpenSpec docs (this file + `phase-5-cvar-optimization/`) and README
-  Phase-5 section.
+* Automated optimizer tests plus the deterministic offline publication
+  experiment.
+* OpenSpec documentation for the implemented optimization contract.
 
 ## Mathematical formulation
 
@@ -153,8 +153,8 @@ charts/portfolio_allocation_comparison.png
 
 1. `pytest` succeeds with ≥ 16 new tests covering every optimisation
    entry point and the scenario builder.
-2. `python run_phase5_optimization_demo.py` produces every CSV / PNG
-   listed under *Saved artefacts* without error.
+2. Optimizer tests validate every public entry point, and the offline
+   publication workflow produces reviewed optimization-comparison artifacts.
 3. Streamlit app shows a working **🎯 Portfolio Optimization** tab.
 4. The min-CVaR LP returns weights with `Σ w = 1`, `w ≥ 0` (long-only),
    `w ≤ max_weight`, and `CVaR ≤ CVaR(current)` on typical inputs.

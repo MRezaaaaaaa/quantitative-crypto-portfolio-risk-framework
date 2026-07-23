@@ -6,8 +6,6 @@ include SECURITY.md
 include app.py
 include requirements.txt
 include requirements-dev.txt
-include run_demo.py
-include run_phase5_optimization_demo.py
 include uv.lock
 recursive-include configs *.yaml
 recursive-include docs *.md
