@@ -1,4 +1,4 @@
-"""Tests for the Phase-5 CVaR portfolio optimization module."""
+"""Tests for the CVaR portfolio optimization module."""
 
 from __future__ import annotations
 
@@ -397,7 +397,7 @@ def test_optimization_import_without_streamlit():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Phase 5.5: shrinkage estimator + max-Sharpe portfolio
+# Shrinkage estimator and maximum-Sharpe portfolio
 # ─────────────────────────────────────────────────────────────────────────────
 
 

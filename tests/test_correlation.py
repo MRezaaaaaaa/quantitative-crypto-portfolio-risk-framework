@@ -1,4 +1,4 @@
-"""Tests for the Phase 5.5 correlation/diversification analytics."""
+"""Tests for correlation and diversification analytics."""
 
 from __future__ import annotations
 

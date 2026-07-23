@@ -3,9 +3,9 @@ requires = ["setuptools>=68,<82", "wheel>=0.45,<1"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "var-cvar-crypto-risk-engine"
+name = "quantitative-crypto-portfolio-risk-framework"
 version = "0.5.0"
-description = "Flexible VaR/CVaR crypto portfolio risk analytics engine"
+description = "Quantitative crypto portfolio risk analytics framework"
 readme = "README.md"
 authors = [{ name = "Mohamadreza Heidari" }]
 requires-python = ">=3.10,<3.14"

@@ -1,4 +1,4 @@
-"""Streamlit frontend for the VaR/CVaR Crypto Portfolio Risk Engine.
+"""Streamlit frontend for the Quantitative Crypto Portfolio Risk Framework.
 
 Run from the project root:
 
@@ -302,7 +302,7 @@ def _fetch_prices(
     return cleaned, used_source, tuple(warnings)
 
 
-# ─── Shared cached data layer (Phase 7) ───────────────────────────────────
+# ─── Shared cached data layer ─────────────────────────────────────────────
 # Base data (prices → returns → portfolio returns) is computed once per
 # "Run risk analysis" click and stored in session_state. The two derived
 # artifacts that used to be recomputed per tab / per rerun — horizon
@@ -368,15 +368,15 @@ def _format_money(value: float) -> str:
 # ─── Page setup ───────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="Crypto VaR/CVaR Risk Engine",
+    page_title="Quantitative Crypto Portfolio Risk Framework",
     page_icon="📉",
     layout="wide",
 )
 
-st.title("📉 Crypto Portfolio VaR / CVaR Risk Engine")
+st.title("📉 Quantitative Crypto Portfolio Risk Framework")
 st.caption(
-    "Interactive frontend for the Phase 1 risk engine — "
-    "Historical, Gaussian, Cornish-Fisher VaR + Historical / Gaussian CVaR."
+    "Interactive risk measurement, backtesting, scenario analysis, robust "
+    "assumptions, and CVaR portfolio optimization."
 )
 
 
@@ -1104,7 +1104,7 @@ with tab_corr:
         st.markdown("#### Correlation matrix")
         st.dataframe(corr_matrix, use_container_width=True)
 
-        # ── Diversification headline metrics (Phase 7) ────────────────────
+        # ── Diversification headline metrics ──────────────────────────────
         n_corr = corr_matrix.shape[0]
         off_diag_mean = float(
             (corr_matrix.to_numpy().sum() - n_corr) / (n_corr * (n_corr - 1))
@@ -1205,7 +1205,7 @@ with tab_corr:
             st.info(f"Not enough observations for a {corr_window}-day rolling window.")
 
 
-# ─── Tab: Robust Assumptions Engine (Phase 7) ─────────────────────────────
+# ─── Tab: Robust Assumptions Engine ───────────────────────────────────────
 
 with tab_assumptions:
     st.header("🧠 Robust Assumptions Engine")
@@ -2368,7 +2368,7 @@ with tab_mc:
         )
 
 
-# ─── Tab 8: Portfolio Optimization (Phase 5) ──────────────────────────────
+# ─── Tab: Portfolio Optimization ──────────────────────────────────────────
 
 with tab_opt:
     st.header("🎯 Portfolio Optimization")
@@ -3052,7 +3052,7 @@ sweep the cap ±2 % to see how stable the weights are.
                 "frontier": frontier_df,
                 "n_scenarios": int(scenarios.shape[0]),
                 "assets": list(scenarios.columns),
-                # Governance (Phase 7)
+                # Optimizer governance
                 "expected_returns": expected_returns_vec,
                 "estimator_label": estimator_label,
                 "robust_cov_used": robust_cov_used,
@@ -3096,7 +3096,7 @@ sweep the cap ±2 % to see how stable the weights are.
         opt_diagnostics = opt_state.get("diagnostics", {})
         opt_bounds = opt_state.get("risk_bounds", {})
 
-        # ── Optimizer input governance (Phase 7) ──────────────────────
+        # ── Optimizer input governance ────────────────────────────────
         with st.expander("🧾 Inputs the optimizer actually received", expanded=True):
             g1, g2, g3, g4 = st.columns(4)
             g1.metric(

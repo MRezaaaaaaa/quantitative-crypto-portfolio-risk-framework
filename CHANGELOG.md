@@ -64,6 +64,9 @@ Versioning when it reaches a public release.
 
 ### Changed
 
+- Renamed the public project and distribution to **Quantitative Crypto
+  Portfolio Risk Framework** while preserving the stable
+  `var_cvar_crypto_risk` Python import namespace.
 - Archived the completed legacy OpenSpec change records under the official
   date-prefixed `openspec/changes/archive/` convention without rewriting the
   already-established current specifications.

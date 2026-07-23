@@ -64,7 +64,7 @@ def test_annualization_returns_floats(sample_portfolio_returns: pd.Series) -> No
     assert math.isfinite(ann_vol)
 
 
-# ── Phase 5.5: horizon returns ──────────────────────────────────────────────
+# ── Horizon returns ────────────────────────────────────────────────────────
 
 
 def test_horizon_returns_simple_overlapping(sample_portfolio_returns: pd.Series) -> None:

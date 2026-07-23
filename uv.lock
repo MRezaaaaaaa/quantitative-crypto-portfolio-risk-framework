@@ -1768,6 +1768,62 @@ wheels = [
 ]
 
 [[package]]
+name = "quantitative-crypto-portfolio-risk-framework"
+version = "0.5.0"
+source = { editable = "." }
+dependencies = [
+    { name = "cvxpy", version = "1.7.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "cvxpy", version = "1.9.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "matplotlib", version = "3.10.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "matplotlib", version = "3.11.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "pandas" },
+    { name = "python-dotenv" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "yfinance" },
+]
+
+[package.optional-dependencies]
+app = [
+    { name = "streamlit" },
+]
+dev = [
+    { name = "build" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+    { name = "setuptools" },
+    { name = "wheel" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "build", marker = "extra == 'dev'", specifier = ">=1.2,<2" },
+    { name = "cvxpy", specifier = ">=1.4,<2" },
+    { name = "matplotlib", specifier = ">=3.7,<4" },
+    { name = "numpy", specifier = ">=1.25,<3" },
+    { name = "pandas", specifier = ">=2.0,<3" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4,<10" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1,<8" },
+    { name = "python-dotenv", specifier = ">=1.0,<2" },
+    { name = "pyyaml", specifier = ">=6.0,<7" },
+    { name = "requests", specifier = ">=2.31,<3" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14,<1" },
+    { name = "scipy", specifier = ">=1.11,<2" },
+    { name = "setuptools", marker = "extra == 'dev'", specifier = ">=68,<82" },
+    { name = "streamlit", marker = "extra == 'app'", specifier = ">=1.32,<2" },
+    { name = "wheel", marker = "extra == 'dev'", specifier = ">=0.45,<1" },
+    { name = "yfinance", specifier = ">=0.2.36,<2" },
+]
+provides-extras = ["app", "dev"]
+
+[[package]]
 name = "referencing"
 version = "0.37.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2390,62 +2446,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/a2/65/b7c6c443ccc58678c
 wheels = [
     { url = "https://files.pythonhosted.org/packages/45/ec/dbb7e5a6b91f86bfb9eb7d2988a2730907b6a729875b949c7f022e8b88fa/uvicorn-0.51.0-py3-none-any.whl", hash = "sha256:5d38af6cd620f2ae3849fb44fd4879e0890aa1febe8d47eb355fb45d93fe6a5b", size = 73219, upload-time = "2026-07-08T10:59:04.44Z" },
 ]
-
-[[package]]
-name = "var-cvar-crypto-risk-engine"
-version = "0.5.0"
-source = { editable = "." }
-dependencies = [
-    { name = "cvxpy", version = "1.7.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "cvxpy", version = "1.9.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "matplotlib", version = "3.10.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "matplotlib", version = "3.11.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "pandas" },
-    { name = "python-dotenv" },
-    { name = "pyyaml" },
-    { name = "requests" },
-    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
-    { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "yfinance" },
-]
-
-[package.optional-dependencies]
-app = [
-    { name = "streamlit" },
-]
-dev = [
-    { name = "build" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-    { name = "setuptools" },
-    { name = "wheel" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "build", marker = "extra == 'dev'", specifier = ">=1.2,<2" },
-    { name = "cvxpy", specifier = ">=1.4,<2" },
-    { name = "matplotlib", specifier = ">=3.7,<4" },
-    { name = "numpy", specifier = ">=1.25,<3" },
-    { name = "pandas", specifier = ">=2.0,<3" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4,<10" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1,<8" },
-    { name = "python-dotenv", specifier = ">=1.0,<2" },
-    { name = "pyyaml", specifier = ">=6.0,<7" },
-    { name = "requests", specifier = ">=2.31,<3" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14,<1" },
-    { name = "scipy", specifier = ">=1.11,<2" },
-    { name = "setuptools", marker = "extra == 'dev'", specifier = ">=68,<82" },
-    { name = "streamlit", marker = "extra == 'app'", specifier = ">=1.32,<2" },
-    { name = "wheel", marker = "extra == 'dev'", specifier = ">=0.45,<1" },
-    { name = "yfinance", specifier = ">=0.2.36,<2" },
-]
-provides-extras = ["app", "dev"]
 
 [[package]]
 name = "watchdog"

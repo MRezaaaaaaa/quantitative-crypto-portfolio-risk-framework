@@ -1,4 +1,4 @@
-"""Manual expected-return views layer (Phase 5.5).
+"""Manual expected-return views layer.
 
 A deliberately small, dependency-light seam for injecting user opinions about
 expected returns into the optimization pipeline. It is the clean input layer

@@ -1,4 +1,4 @@
-"""Tests for var_cvar_crypto_risk.backtesting (Phase 3)."""
+"""Tests for ``var_cvar_crypto_risk.backtesting``."""
 
 from __future__ import annotations
 
@@ -631,7 +631,7 @@ def test_compare_does_not_crash_on_bad_method(clean_returns_1000):
 
 
 def test_report_table_has_required_columns(clean_returns_1000):
-    """All 15 required columns are present (Horizon column added in Phase 4)."""
+    """All 15 required columns, including the horizon, are present."""
     _, comparison = compare_var_models_backtest(
         clean_returns_1000,
         methods=["historical", "gaussian", "cornish_fisher"],
@@ -692,7 +692,7 @@ def test_report_table_labels_none_as_inconclusive() -> None:
     assert report.loc[0, "CC Pass"] == "— Inconclusive"
 
 
-# ── Phase 4: horizon-aware backtesting ──────────────────────────────────────
+# ── Horizon-aware backtesting ──────────────────────────────────────────────
 
 
 def test_calculate_realized_horizon_returns_simple():
@@ -805,7 +805,7 @@ def test_rolling_var_forecast_horizon_preserves_no_lookahead():
     assert out["var_forecast"].iloc[0] == pytest.approx(expected_var)
 
 
-# ── Phase 5.5: backtest mode + breach-rate + worst losses + by-period ────────
+# ── Backtest mode, breach rate, worst losses, and period summaries ─────────
 
 
 def test_non_overlapping_fewer_observations_than_overlapping(clean_returns_1000):

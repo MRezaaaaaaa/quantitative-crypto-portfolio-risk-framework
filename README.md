@@ -1,13 +1,11 @@
-# Crypto Portfolio Risk Platform
+# Quantitative Crypto Portfolio Risk Framework
 
 [![Python](https://img.shields.io/badge/Python-3.10--3.13-blue)](https://www.python.org/)
 [![Version](https://img.shields.io/badge/version-0.5.0-informational)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A research-oriented Python and Streamlit platform for measuring, validating,
-simulating, and optimizing multi-asset portfolio tail risk. The current
-development version focuses on crypto assets while retaining a generic tabular
-portfolio core.
+A research-oriented Python and Streamlit framework for measuring, validating,
+simulating, and optimizing crypto-portfolio tail risk.
 
 The project is designed to make model assumptions visible. It is not a trading
 system, a regulatory capital implementation, or evidence of future investment

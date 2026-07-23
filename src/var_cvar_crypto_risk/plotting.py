@@ -227,7 +227,7 @@ def plot_drawdown(
     return fig
 
 
-# ─── Phase 3: VaR backtesting charts ──────────────────────────────────────
+# ─── VaR backtesting charts ───────────────────────────────────────────────
 
 
 _TRAFFIC_LIGHT_EDGE = {
@@ -379,7 +379,7 @@ def plot_breach_timeline(
     return fig
 
 
-# ─── Phase 4: Monte Carlo charts ──────────────────────────────────────────
+# ─── Monte Carlo charts ───────────────────────────────────────────────────
 
 
 def plot_mc_loss_distribution(
@@ -671,7 +671,7 @@ def plot_var_cvar_method_comparison(
     return fig
 
 
-# ─── Phase 5: CVaR optimization charts ────────────────────────────────────
+# ─── CVaR optimization charts ─────────────────────────────────────────────
 
 
 def plot_optimized_weights(
@@ -1042,7 +1042,7 @@ def plot_model_comparison_backtest(
     return fig
 
 
-# ─── Phase 5.5: breach-rate, distribution, asset-level, correlation charts ───
+# ─── Breach-rate, distribution, asset-level, and correlation charts ──────
 
 
 def plot_rolling_breach_rate(

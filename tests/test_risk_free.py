@@ -1,4 +1,4 @@
-"""Tests for the Phase 5.5 risk-free rate helper."""
+"""Tests for the risk-free-rate helper."""
 
 from __future__ import annotations
 

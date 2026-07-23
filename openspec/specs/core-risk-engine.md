@@ -1,16 +1,16 @@
 # Core Risk Engine — OpenSpec
 
-> **Status: Implemented — Phase 1**
+> **Status: Implemented**
 
 ## Purpose
 
-Provide a flexible, modular, production-quality VaR/CVaR risk engine for crypto
-portfolios that can be extended with backtesting, Monte Carlo, optimization,
-stress testing, and risk contribution modules in subsequent phases.
+Provide a flexible, modular VaR/CVaR risk engine for crypto portfolios. The
+core calculation modules are consumed by separate backtesting, Monte Carlo,
+optimization, plotting, and Streamlit layers.
 
 ## Scope
 
-In scope for Phase 1:
+Core-engine scope:
 
 - Configurable data ingestion (CoinGecko primary, yfinance fallback, CSV manual).
 - Price preprocessing, alignment, and validation.
@@ -20,12 +20,12 @@ In scope for Phase 1:
 - Portfolio-level distribution statistics, drawdown, and Sharpe.
 - Tabular and chart export to `outputs/`.
 
-Explicitly out of scope for Phase 1:
+Outside the core-engine module boundary:
 
-- Streamlit dashboards.
-- Monte Carlo simulation.
+- Streamlit presentation.
+- Monte Carlo scenario generation.
 - CVaR portfolio optimization.
-- Backtesting / coverage tests.
+- Backtesting and coverage tests.
 - Stress testing.
 - Risk contribution / decomposition.
 
@@ -50,8 +50,9 @@ Explicitly out of scope for Phase 1:
 
 ## Non-Functional Requirements
 
-- **Performance.** End-to-end demo on three assets and ~5 years of daily data
-  must complete in well under a minute on a developer laptop.
+- **Performance.** Core risk calculations on three assets and approximately
+  five years of daily data must complete in well under a minute on a standard
+  developer laptop.
 - **Maintainability.** No calculation logic in scripts; ABCs for VaR/CVaR
   models; configuration-driven inputs; no hard-coded asset names or paths in
   calculation functions.
@@ -90,34 +91,34 @@ Explicitly out of scope for Phase 1:
 ## Acceptance Criteria
 
 1. Project installs successfully via `pip install -e .` and `pip install -r requirements.txt`.
-2. `python run_phase1_demo.py` runs end-to-end and exits with status 0.
+2. The offline regression suite exercises the core pipeline without live API
+   calls.
 3. CoinGecko, yfinance fallback, and CSV loading are implemented.
 4. Risk metrics are reported at the portfolio level.
 5. Historical, Gaussian, and Cornish-Fisher VaR are implemented.
 6. Historical and Gaussian CVaR are implemented.
-7. Outputs are persisted to `outputs/tables` and `outputs/charts`.
+7. Export helpers persist tables and charts to configured destinations.
 8. Pytest suite passes.
 9. README is complete and professional.
-10. OpenSpec files document future upgrade paths.
-11. No Streamlit, Monte Carlo, optimization, or backtesting code is present in Phase 1.
-12. Modular architecture is ready for Phase 2 extension without rewrites.
+10. OpenSpec files document current contracts and planned extensions.
+11. Core calculation modules do not import Streamlit or perform implicit
+    network access.
+12. Module boundaries permit additive extensions without rewriting the core.
 
-## Future Extension Points
+## Integrated and Planned Layers
 
-- **Phase 2 (Streamlit).** Imports the public API from
-  `var_cvar_crypto_risk.__init__` and renders the same risk summary
-  interactively. No engine changes required.
-- **Phase 3 (Backtesting).** New module `backtesting.py` consumes
-  `portfolio_returns` and a `VaRModel` instance, runs rolling-window VaR, and
-  performs Kupiec / Christoffersen tests.
-- **Phase 4 (Monte Carlo).** New `MonteCarloVaR(VaRModel)` and
-  `MonteCarloCVaR(CVaRModel)` subclasses plug into `_DISPATCH` dictionaries.
-- **Phase 5 (Optimization).** New `optimization.py` consumes asset returns and
-  emits weights, which are then validated by the existing `validate_weights`.
-- **Phase 6 (Advanced).** GARCH and copula models extend the VaR/CVaR ABCs;
-  no consumer code changes are needed.
+- **Streamlit.** `app.py` renders risk analysis and model diagnostics
+  interactively.
+- **Backtesting.** `backtesting.py` consumes portfolio returns, runs rolling
+  VaR forecasts, and performs Kupiec and Christoffersen tests.
+- **Monte Carlo.** `monte_carlo.py` generates multivariate Normal and
+  Student-t scenarios and paths.
+- **Optimization.** `optimization.py` consumes scenario returns and emits
+  constraint-validated portfolio weights.
+- **Advanced risk (planned).** GARCH, copula, stress-testing, and risk
+  contribution capabilities remain separate future changes.
 
-## Phase 5.5 additions
+## Current Enhancements
 
 - **Horizon returns.** `returns.calculate_horizon_returns(returns, horizon_days,
   method, overlapping)` aggregates daily returns into h-day returns (simple ⇒

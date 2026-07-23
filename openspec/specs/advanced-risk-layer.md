@@ -1,8 +1,7 @@
 # Advanced Risk Layer
 
-> **Status: Planned — Phase 6**
-> This specification is planned for a future phase.
-> Do not implement any code described here in Phase 1.
+> **Status: Planned**
+> Implement only through a separately reviewed OpenSpec change.
 
 ## Purpose
 
@@ -24,4 +23,5 @@ joint distributions, and dynamic conditional correlation (DCC).
 
 ## Dependencies
 
-Requires Phase 1 Core Risk Engine to be complete.
+Requires the implemented core risk, covariance-governance, scenario, and
+validation contracts.

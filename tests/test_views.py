@@ -1,4 +1,4 @@
-"""Tests for the Phase 5.5 manual expected-return views layer."""
+"""Tests for the manual expected-return views layer."""
 
 from __future__ import annotations
 

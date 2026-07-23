@@ -824,7 +824,7 @@ def backtest_var_model(
     -------
     tuple
         ``(forecast_df, result_dict)`` where ``result_dict`` contains the keys
-        documented in the Phase 3 / Phase 4 specifications (including
+        documented in the backtesting and Monte Carlo specifications (including
         ``horizon_days``).
     """
     forecast_df = rolling_var_forecast(

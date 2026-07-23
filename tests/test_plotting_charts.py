@@ -1,4 +1,4 @@
-"""Smoke tests for the Phase 5.5 chart helpers (figures are produced)."""
+"""Smoke tests for chart helpers that produce Matplotlib figures."""
 
 from __future__ import annotations
 

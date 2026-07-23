@@ -1,8 +1,8 @@
 # CVaR Portfolio Optimization
 
-> **Status: Implemented — Phase 5 (v0.5.0)**
+> **Status: Implemented**
 > Provides scenario-based portfolio optimization built on top of the
-> Phase-4 Monte Carlo engine.
+> Monte Carlo scenario engine.
 
 ## Purpose
 
@@ -25,7 +25,7 @@ or balance the two along an efficient frontier.
      `min CVaR(w)  s.t.  μᵀw ≥ r*`.
 * CVaR efficient frontier sweep across target returns.
 * Multiple scenario sources: historical, Normal Monte Carlo, Student-t
-  Monte Carlo (sharing the Phase-4 simulator).
+  Monte Carlo (sharing the common scenario engine).
 * Optional cash asset injected into the scenario matrix at a constant
   per-horizon return.
 * Long-only / short-allowed switch with explicit min/max weight box
@@ -135,14 +135,14 @@ charts/portfolio_allocation_comparison.png
   `test_optimization_import_without_streamlit`.
 * **Reproducibility.** Same `random_seed` → same Monte Carlo scenario
   matrix → same optimal weights.
-* **Backwards compatibility.** No changes to Phase 1-4 public APIs.
+* **Backwards compatibility.** Existing public analytics APIs remain stable.
 
 ## Edge cases
 
 | Case | Handling |
 |------|----------|
 | All-cash portfolio in scenario matrix | Treated as a regular asset; LP still respects budget = 1. |
-| Singular covariance matrix in MC source | Phase-4 `_safe_cholesky` falls back to jittered Cholesky. |
+| Singular covariance matrix in MC source | `_safe_cholesky` falls back to jittered Cholesky. |
 | Infeasible target return / CVaR cap | Returns `status = "infeasible"`; demo and Streamlit show the message and continue. |
 | Long-only + negative `min_weight` | Effective lower bound is `max(0, min_weight)`. Streamlit warns the user. |
 | Empty / degenerate scenario matrix | `validate_scenario_matrix` raises `ValueError` before solver runs. |
@@ -176,9 +176,9 @@ charts/portfolio_allocation_comparison.png
 ## Dependencies
 
 * `cvxpy >= 1.4`
-* Phase-1 (`risk_metrics`), Phase-4 (`monte_carlo`) modules.
+* `risk_metrics` and `monte_carlo` modules.
 
-## Phase 5.5 additions
+## Current Enhancements
 
 - **Maximum Sharpe portfolio.** `maximize_sharpe_ratio(...)` selects the highest
   Sharpe `(E[r] - rf) / vol` portfolio from constraint-feasible candidates

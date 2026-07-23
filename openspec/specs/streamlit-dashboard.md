@@ -1,32 +1,31 @@
 # Streamlit Dashboard
 
-> **Status: Planned — Phase 2**
-> This specification is planned for a future phase.
-> Do not implement any code described here in Phase 1.
+> **Status: Implemented**
 
 ## Purpose
 
-Deliver an interactive Streamlit application that wraps the Phase 1 risk
-engine, letting analysts upload portfolios, change confidence levels and
-horizons, and inspect VaR / CVaR / drawdown live without touching code.
+Deliver an interactive Streamlit application that wraps the analytics engine,
+letting analysts configure portfolios, change confidence levels and horizons,
+and inspect risk, validation, scenario, assumption, and optimization outputs
+without modifying code.
 
-## Planned Scope
+## Implemented Scope
 
-- Streamlit multipage app (`app.py`) with sidebar configuration controls.
+- Streamlit single-page, tabbed app (`app.py`) with sidebar configuration
+  controls.
 - Asset selector with live weight editor and validation.
 - Confidence-level and horizon sliders.
 - Tabs for: portfolio overview, distribution + VaR/CVaR chart, drawdown,
   per-method comparison table.
-- CSV upload for custom price data.
 - Caching via `st.cache_data` for expensive fetches.
 - Download buttons for the risk summary CSV and chart PNGs.
-- Deployable on Streamlit Community Cloud with a one-click config.
 
 ## Dependencies
 
-Requires Phase 1 Core Risk Engine to be complete.
+Consumes the public analytics modules under `var_cvar_crypto_risk`; the
+calculation modules do not import Streamlit.
 
-## Phase 5.5 additions
+## Current Capabilities
 
 - **New "Correlation & Diversification" tab** — correlation matrix, matplotlib
   heatmap, and rolling average pairwise correlation (30/60/90/180-day window).

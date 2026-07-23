@@ -1,4 +1,4 @@
-"""Robust Assumptions Engine (Phase 7).
+"""Robust assumptions engine.
 
 Pure analytics: no plotting, no Streamlit, no I/O.
 

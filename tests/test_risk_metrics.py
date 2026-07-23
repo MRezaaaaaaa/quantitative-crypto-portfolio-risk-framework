@@ -110,7 +110,7 @@ def test_max_drawdown_zero_for_all_positive_returns() -> None:
     assert dd >= -1e-12
 
 
-# ── Phase 5.5: asset-level drawdowns ────────────────────────────────────────
+# ── Asset-level drawdowns ──────────────────────────────────────────────────
 
 
 def test_calculate_asset_drawdowns_columns_and_sign(sample_returns: pd.DataFrame) -> None:

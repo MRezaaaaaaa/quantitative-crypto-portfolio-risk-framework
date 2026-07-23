@@ -1,5 +1,5 @@
 project:
-  name: "Flexible VaR/CVaR Crypto Portfolio Risk Engine"
+  name: "Quantitative Crypto Portfolio Risk Framework"
   version: "0.5.0"
 
 data:

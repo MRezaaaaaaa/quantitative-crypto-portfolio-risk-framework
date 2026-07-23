@@ -679,7 +679,7 @@ def generate_publication_bundle(
             "git": git,
             "python_version": platform.python_version(),
             "package_version": importlib.metadata.version(
-                "var-cvar-crypto-risk-engine"
+                "quantitative-crypto-portfolio-risk-framework"
             ),
         },
         "data": data_metadata,

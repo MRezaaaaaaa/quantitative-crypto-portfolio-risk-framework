@@ -1,5 +1,4 @@
-"""Tests for the Phase-7 correlation additions (weighted average and
-stress-vs-normal conditional correlation)."""
+"""Tests for weighted-average and stress-versus-normal correlation diagnostics."""
 
 from __future__ import annotations
 

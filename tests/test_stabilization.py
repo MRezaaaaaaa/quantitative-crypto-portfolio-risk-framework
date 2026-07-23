@@ -1,4 +1,4 @@
-"""Stabilization tests for the Phase 3 cleanup pass.
+"""Stabilization tests for package imports and export helpers.
 
 These tests guard against regressions where importing core analytics
 accidentally pulls in optional data-source dependencies (yfinance, the

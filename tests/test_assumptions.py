@@ -1,4 +1,4 @@
-"""Tests for the Phase-7 Robust Assumptions Engine."""
+"""Tests for the robust assumptions engine."""
 
 from __future__ import annotations
 

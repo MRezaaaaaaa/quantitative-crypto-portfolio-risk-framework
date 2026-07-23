@@ -1,6 +1,6 @@
 # Monte Carlo Scenario Engine
 
-> **Status: Implemented — Phase 4 (`v0.4.0`)**
+> **Status: Implemented**
 
 ## Purpose
 
@@ -10,11 +10,10 @@ scenario-based VaR / CVaR over the simulated distribution. The engine also
 simulates portfolio value paths so the user can visualise plausible future
 outcomes.
 
-The engine sits between historical / parametric VaR (Phase 1) and the
-backtesting machinery (Phase 3): users can compare Monte Carlo against
-historical and parametric estimates in one table.
+Users can compare Monte Carlo outputs against historical and parametric risk
+estimates in one table.
 
-## Scope (implemented in Phase 4)
+## Implemented Scope
 
 * `estimate_return_parameters` — mean vector, covariance, correlation,
   volatility from historical asset returns; optional annualisation
@@ -103,16 +102,14 @@ historical and parametric estimates in one table.
 
 ## Future extension points
 
-* CVaR portfolio optimisation (Phase 5) consumes Monte Carlo scenarios
-  as input to the linear program.
-* Filtered Historical Simulation / GARCH-residual bootstrap (Phase 6).
+* CVaR portfolio optimization consumes Monte Carlo scenarios as input to the
+  linear program.
+* Filtered Historical Simulation and GARCH-residual bootstrap remain planned.
 * Stress testing and shock injection.
 * Copula-based dependence modelling.
 * Risk contribution decomposition (Euler / Component VaR).
 
 ## Dependencies
 
-* Requires Phase 1 (returns, portfolio aggregation, VaR / CVaR
-  abstractions).
-* Reused inside the Phase 3 backtesting comparison via
-  `compare_all_risk_methods`.
+* Requires the returns, portfolio aggregation, and VaR/CVaR contracts.
+* Reused by risk-method comparison and portfolio optimization workflows.

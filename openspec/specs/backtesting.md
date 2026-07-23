@@ -1,14 +1,13 @@
 # Backtesting & Model Validation — OpenSpec
 
-> **Status: Implemented — Phase 3**
+> **Status: Implemented**
 
 ## 1. Purpose
 
-Convert the engine from a one-shot VaR/CVaR calculator into a model
-*validation* engine aligned with the Basel III market risk framework
-(BCBS 2019). Phase 3 produces evidence — statistical and visual — that any
-chosen VaR model is or is not adequate for the realised portfolio return
-distribution over a chosen historical period.
+Provide statistical and visual diagnostics for evaluating VaR forecasts
+against realized portfolio returns. Kupiec and Christoffersen tests examine
+coverage and breach dependence; they do not by themselves establish complete
+model validity or regulatory compliance.
 
 ## 2. Scope
 
@@ -20,19 +19,18 @@ distribution over a chosen historical period.
 - Christoffersen Conditional Coverage test (combined POF + Independence).
 - Two-tier traffic light system: Basel III absolute counts (250-day standard
   window) and a generalised ratio-based variant for non-standard windows.
-- Multi-model comparison across the three VaR families implemented in
-  Phase 1: Historical, Gaussian, Cornish-Fisher.
+- Multi-model comparison across Historical, Gaussian, and Cornish-Fisher VaR.
 - Backtesting CSV exports and PNG charts.
 - A new Streamlit tab ("Backtesting & Model Validation") wrapping the
   pipeline behind interactive controls.
 - Unit tests for every public function and edge case.
 
 ### Out of scope
-- Monte Carlo simulation (Phase 4).
-- CVaR backtesting / Expected Shortfall validation (Phase 5).
-- GARCH-based conditional coverage tests (Phase 6).
+- Monte Carlo simulation as a VaR forecast method.
+- CVaR backtesting / Expected Shortfall validation.
+- GARCH-based conditional coverage tests.
 - Filtered Historical Simulation, DCC-GARCH, copula-based dependence
-  modelling (Phase 6).
+  modelling.
 - Stress testing or risk-contribution decomposition.
 - Optimisation under backtested constraints.
 
@@ -240,23 +238,21 @@ length.
     existing tab logic.
 12. The pytest suite (50 backtesting tests) all pass; the prior 42 tests
     still pass.
-13. README has a Phase 3 section documenting the methodology.
+13. Public methodology documentation explains backtesting scope and limits.
 14. This OpenSpec document is fully written.
-15. None of the explicit Phase 3 exclusions (Monte Carlo, CVaR
-    optimisation, stress testing) are present in the code.
+15. The backtesting module does not silently claim support for CVaR
+    backtesting, GARCH conditional tests, or regulatory validation.
 
 ## 11. Future Extension Points
 
-- **Phase 4 — Monte Carlo:** generate synthetic breach paths to bound the
-  sampling distribution of breach counts; supports super-Bonferroni
-  multi-period coverage tests.
-- **Phase 5 — CVaR / ES backtesting:** implement Acerbi-Székely Z2 / Z3
-  ES tests (FRTB), and the McNeil-Frey ES residual test.
-- **Phase 6 — GARCH conditional coverage:** Engle-Manganelli dynamic
-  conditional quantile (DQ) test, and DCC-GARCH for multi-asset breach
-  dependency.
+- **Monte Carlo validation:** generate synthetic breach paths to assess the
+  sampling distribution of breach counts.
+- **CVaR / ES backtesting:** evaluate appropriate Expected Shortfall tests
+  through a separately reviewed methodology change.
+- **Conditional coverage:** consider dynamic quantile tests and conditional
+  volatility models without presenting them as regulatory approval.
 
-## Phase 5.5 additions
+## Current Enhancements
 
 - **Backtesting mode.** `rolling_var_forecast`, `backtest_var_model`, and
   `compare_var_models_backtest` accept `backtest_mode ∈ {"overlapping",

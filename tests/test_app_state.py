@@ -1,4 +1,4 @@
-"""Streamlit session-state test for the asset editor (Phase 5.5, G1).
+"""Streamlit session-state test for the asset editor.
 
 Validates that the asset-table initialization does not overwrite an existing
 ``st.session_state["assets_df"]`` — i.e. user edits survive reruns. Uses

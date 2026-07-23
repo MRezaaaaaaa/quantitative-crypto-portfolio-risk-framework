@@ -1,11 +1,11 @@
-"""Scenario-based CVaR portfolio optimization (Phase 5).
+"""Scenario-based CVaR portfolio optimization.
 
 This module is pure analytics: no plotting, no Streamlit, no I/O.
 
 It implements the **Rockafellar-Uryasev** linear-programming formulation
 of CVaR optimization on top of a scenario return matrix
 ``R ∈ R^{n_scenarios x n_assets}``. The scenario matrix can come from
-historical returns or from the Phase-4 Monte Carlo engine.
+historical returns or from the Monte Carlo scenario engine.
 
 Conventions
 -----------
@@ -1608,7 +1608,7 @@ def compare_current_vs_optimized(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Public: governance — feasibility diagnostics & result interpretation (Phase 7)
+# Public: governance — feasibility diagnostics and result interpretation
 # ─────────────────────────────────────────────────────────────────────────────
 
 

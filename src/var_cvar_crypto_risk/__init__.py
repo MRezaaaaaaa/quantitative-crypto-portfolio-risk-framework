@@ -1,4 +1,4 @@
-"""Flexible VaR/CVaR Crypto Portfolio Risk Engine.
+"""Quantitative Crypto Portfolio Risk Framework.
 
 Lightweight package init — does **not** import data-source modules
 (``coingecko_client``, ``yfinance_client``, ``data_loader``) so importing
@@ -12,4 +12,4 @@ Import submodules explicitly, for example::
 """
 
 __version__ = "0.5.0"
-__project__ = "Flexible VaR/CVaR Crypto Portfolio Risk Engine"
+__project__ = "Quantitative Crypto Portfolio Risk Framework"

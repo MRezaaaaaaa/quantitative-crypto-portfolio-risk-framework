@@ -1,4 +1,4 @@
-"""Tests for Phase-7 optimizer governance: feasibility diagnostics,
+"""Tests for optimizer governance: feasibility diagnostics,
 result interpretation, zero-mu warnings, Max-Sharpe cash handling, and
 covariance overrides in the scenario builder."""
 
@@ -327,7 +327,7 @@ def test_scenario_builder_mean_override(asset_returns):
 
 
 def test_scenario_builder_default_unchanged(asset_returns):
-    """No override ⇒ same output as before Phase 7 (regression guard)."""
+    """No override preserves the established output (regression guard)."""
     a = build_optimization_scenarios(
         asset_returns, source="student_t_mc", n_scenarios=500, random_seed=42
     )

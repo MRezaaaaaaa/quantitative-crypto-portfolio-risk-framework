@@ -1,4 +1,4 @@
-"""Asset-return correlation and diversification analytics (Phase 5.5).
+"""Asset-return correlation and diversification analytics.
 
 Pure analytics: no plotting, no Streamlit, no I/O. The plotting counterparts
 live in :mod:`var_cvar_crypto_risk.plotting`.

@@ -1,4 +1,4 @@
-"""Tests for ``var_cvar_crypto_risk.monte_carlo`` (Phase 4)."""
+"""Tests for ``var_cvar_crypto_risk.monte_carlo``."""
 
 from __future__ import annotations
 
