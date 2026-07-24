@@ -64,6 +64,8 @@ Versioning when it reaches a public release.
 
 ### Changed
 
+- Raised the locked `setuptools` build-tool floor to `83.0.0` to remediate
+  `CVE-2026-59890` before producing public source distributions.
 - Limited push-triggered CI runs to `main`; pull requests retain their own CI
   run so automation branches are not tested twice.
 - Migrated active OpenSpec capabilities from legacy flat Markdown files to the
