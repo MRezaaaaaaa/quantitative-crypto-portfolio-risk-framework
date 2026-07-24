@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quantitative-crypto-portfolio-risk-framework"
-version = "0.5.0"
+version = "1.0.0"
 description = "Quantitative crypto portfolio risk analytics framework"
 readme = "README.md"
 authors = [{ name = "Mohamadreza Heidari" }]

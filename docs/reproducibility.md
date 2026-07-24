@@ -12,7 +12,7 @@ The project distinguishes three levels:
 3. **Research reproducibility** — a reader can obtain legally usable input data
    and regenerate every table or figure used in an article.
 
-Version 0.5.0 establishes a tested code baseline, a cross-platform dependency
+Version 1.0.0 establishes a tested code baseline, a cross-platform dependency
 lock, a deterministic synthetic numerical baseline, and a config-driven
 publication workflow. The included experiment provides research
 reproducibility for a synthetic methodology demonstration. A separately

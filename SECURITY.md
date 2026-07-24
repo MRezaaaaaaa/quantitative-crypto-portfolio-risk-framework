@@ -2,15 +2,15 @@
 
 ## Supported versions
 
-The project is in pre-1.0 development. Security fixes are applied only to the
-latest version on the default branch.
+Security fixes are applied to the latest `1.x` release and the default branch.
+Pre-1.0 development versions are not supported.
 
 ## Reporting a vulnerability
 
 Do not open a public issue for a suspected vulnerability or exposed secret.
 Use GitHub Private Vulnerability Reporting from the repository's **Security**
 tab. Select **Report a vulnerability** and submit the report privately. This
-feature must be enabled in the repository settings before the public release.
+feature is enabled for the public repository.
 
 If private vulnerability reporting is temporarily unavailable, do not disclose
 the issue in a public issue, discussion, pull request, or social-media post.
@@ -29,13 +29,9 @@ they may be reported through the normal issue process after public release.
 
 ## Repository security controls
 
-The repository defines pinned CodeQL and Dependency Review workflows and a
-local public-boundary policy check. These files are preparatory until they run
-successfully on GitHub; their presence alone is not evidence that scanning is
-active.
-
-Before public release, the repository owner must also enable GitHub Secret
-Scanning and Push Protection where available, enable Private Vulnerability
-Reporting, review Dependabot alerts, and protect the default branch with
-required CI/security checks. See the
+The repository runs SHA-pinned CodeQL and Dependency Review workflows and
+enforces local and Git-history public-boundary policy checks. GitHub Secret
+Scanning, Push Protection, Dependabot alerts and security updates, Private
+Vulnerability Reporting, and required CI/security checks on the protected
+default branch are enabled. See the
 [public release checklist](docs/public-release-checklist.md).

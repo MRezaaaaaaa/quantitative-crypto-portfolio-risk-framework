@@ -1,10 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. The format
-is based on Keep a Changelog, and the project intends to follow Semantic
-Versioning when it reaches a public release.
+is based on Keep a Changelog, and the project follows Semantic Versioning.
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-07-24
 
 ### Added
 
@@ -91,7 +92,8 @@ Versioning when it reaches a public release.
   coverage, reporting, and the Streamlit presentation.
 - Clarified that backtesting traffic lights describe breach frequency rather
   than complete model validity.
-- Synchronized package development-version metadata at 0.5.0.
+- Promoted synchronized package metadata from the 0.5.0 development baseline
+  to the 1.0.0 first public release.
 - Updated contributor setup and quality gates to use the exact locked
   environment.
 - Corrected release-blocking README phase and feature contradictions.
