@@ -1,9 +1,9 @@
 """Fail when files prepared for publication cross the public/private boundary.
 
 This lightweight repository policy check complements, but does not replace,
-provider-backed secret scanning and push protection on the future GitHub
-remote. It reports only file, line, and rule names so a detected credential is
-never repeated in CI logs.
+provider-backed secret scanning and push protection on GitHub. It reports only
+file, line, and rule names so a detected credential is never repeated in CI
+logs.
 """
 
 from __future__ import annotations

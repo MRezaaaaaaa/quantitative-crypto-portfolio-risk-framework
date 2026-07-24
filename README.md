@@ -1,7 +1,9 @@
 # Quantitative Crypto Portfolio Risk Framework
 
 [![Python](https://img.shields.io/badge/Python-3.10--3.13-blue)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-0.5.0-informational)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.0-informational)](CHANGELOG.md)
+[![CI](https://github.com/MRezaaaaaaa/quantitative-crypto-portfolio-risk-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/MRezaaaaaaa/quantitative-crypto-portfolio-risk-framework/actions/workflows/ci.yml)
+[![Security](https://github.com/MRezaaaaaaa/quantitative-crypto-portfolio-risk-framework/actions/workflows/security.yml/badge.svg)](https://github.com/MRezaaaaaaa/quantitative-crypto-portfolio-risk-framework/actions/workflows/security.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A research-oriented Python and Streamlit framework for measuring, validating,
@@ -27,8 +29,8 @@ performance.
   before parametric simulation.
 - Independently validates optimizer budget, bound, return, CVaR, and auxiliary
   constraint residuals instead of trusting solver status alone.
-- Enforces a local public/private publication boundary and defines pinned
-  CodeQL and dependency-review workflows for the future GitHub remote.
+- Enforces local and Git-history public/private publication boundaries and runs
+  SHA-pinned CodeQL and dependency-review workflows on GitHub.
 - Generates and verifies deterministic offline publication bundles with pinned
   inputs, assumptions, cutoffs, source revisions, and artifact hashes.
 - Exposes assumptions and diagnostics through an interactive Streamlit app.
@@ -203,21 +205,22 @@ Dependency declarations and the committed lockfile workflow are documented in
 - Solver success is accepted only after independent numerical residual checks;
   passing those checks still does not prove economic optimality or future
   feasibility.
-- No portfolio-monitoring or rebalancing engine is included in version 0.5.0.
+- No portfolio-monitoring or rebalancing engine is included in version 1.0.0.
 
 See [Model risk](docs/model-risk.md) for the complete interpretation framework.
 
 ## Current release status
 
-Version `0.5.0` is a pre-1.0 research and development version. Work required
-before `v1.0.0` includes:
+Version `1.0.0` is the first public research release. The public repository
+requires the supported Python test matrix, coverage/build/app checks, OpenSpec,
+CodeQL, and Dependency Review before protected-branch updates. Secret Scanning,
+Push Protection, Dependabot security updates, and Private Vulnerability
+Reporting are enabled.
 
-- exercising the configured CI workflow on the future public GitHub remote;
-- exercising the security workflows and enabling remote-only Secret Scanning,
-  Push Protection, Private Vulnerability Reporting, and branch rules;
-- selecting a legally redistributable real-market dataset if future articles
-  make market-specific empirical claims. The current publication workflow is a
-  synthetic methodology demonstration only.
+The included publication workflow remains a synthetic methodology
+demonstration. A separately licensed and pinned real-market dataset is required
+before an article makes market-specific empirical or performance claims.
+Portfolio monitoring and rebalancing remain planned post-1.0 capabilities.
 
 The local and CI test suites enforce an 80% package coverage floor. Coverage is
 a regression guard, not evidence that the financial models are correct.
