@@ -64,6 +64,8 @@ Versioning when it reaches a public release.
 
 ### Changed
 
+- Limited push-triggered CI runs to `main`; pull requests retain their own CI
+  run so automation branches are not tested twice.
 - Migrated active OpenSpec capabilities from legacy flat Markdown files to the
   validated `openspec/specs/<capability>/spec.md` requirement-and-scenario
   structure and added strict CI validation with OpenSpec `1.3.1`.
