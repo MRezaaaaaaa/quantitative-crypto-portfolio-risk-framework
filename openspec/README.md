@@ -2,7 +2,7 @@
 
 This directory records the current behavioral contracts and the reviewed
 history of specification changes. The repository currently validates with
-OpenSpec CLI `0.16.0`.
+OpenSpec CLI `1.3.1`.
 
 ## Layout
 
@@ -27,10 +27,12 @@ openspec/
 Install the reviewed CLI version and validate every active capability:
 
 ```bash
-npm install --global @fission-ai/openspec@0.16.0
+npm install --global @fission-ai/openspec@1.3.1
 openspec list --specs
 openspec validate --all --strict --no-interactive
 ```
+
+CI runs the same version with telemetry and npm lifecycle scripts disabled.
 
 Every current capability MUST use:
 
