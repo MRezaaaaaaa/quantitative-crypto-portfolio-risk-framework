@@ -34,8 +34,8 @@
       plan.
 - [x] Pass strict OpenSpec validation.
 - [x] Pass Markdown-link validation and `git diff --check`.
-- [ ] Commit and push design-only files to `phase-8-spec`.
-- [ ] Open Draft PR `design: specify Phase 8 portfolio experiment monitor` and
+- [x] Commit and push design-only files to `phase-8-spec`.
+- [x] Open Draft PR `design: specify Phase 8 portfolio experiment monitor` and
       stop for review.
 
 ## Batch 2 — Persistence foundation
