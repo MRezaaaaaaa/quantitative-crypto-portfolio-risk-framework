@@ -57,19 +57,19 @@
 
 ## Batch 3 — Valuation and experiment registry
 
-- [ ] Add experiment create/query/transition/archive services and event audit.
-- [ ] Add serializable optimizer and risk recipe objects.
-- [ ] Add point-in-time optimization adapter that calls existing assumptions,
+- [x] Add experiment create/query/transition/archive services and event audit.
+- [x] Add serializable optimizer and risk recipe objects.
+- [x] Add point-in-time optimization adapter that calls existing assumptions,
       scenarios, optimizer, and residual validation functions.
-- [ ] Add validated immutable snapshot and target-allocation persistence.
-- [ ] Add strict monitoring price normalization without silent forward fill.
-- [ ] Add next-complete-observation launch validation and fixed quantities.
-- [ ] Add deterministic zero/rate cash accrual from launch, not previous writes.
-- [ ] Add daily NAV, benchmark, current weights, drift, total drift, running peak,
+- [x] Add validated immutable snapshot and target-allocation persistence.
+- [x] Add strict monitoring price normalization without silent forward fill.
+- [x] Add next-complete-observation launch validation and fixed quantities.
+- [x] Add deterministic zero/rate cash accrual from launch, not previous writes.
+- [x] Add daily NAV, benchmark, current weights, drift, total drift, running peak,
       drawdown, and maximum drawdown.
-- [ ] Add incomplete-date/data-quality behavior and atomic daily writes.
-- [ ] Add CSV/JSON export bundles and secret-free manifests.
-- [ ] Add valuation, hashing, registry, snapshot, data-quality, and export tests.
+- [x] Add incomplete-date/data-quality behavior and atomic daily writes.
+- [x] Add CSV/JSON export bundles and secret-free manifests.
+- [x] Add valuation, hashing, registry, snapshot, data-quality, and export tests.
 
 ## Batch 4 — Historical Out-of-Sample Replay
 

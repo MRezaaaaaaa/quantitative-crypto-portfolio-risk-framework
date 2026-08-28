@@ -2,21 +2,30 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
+import math
 from types import TracebackType
 from typing import Protocol
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload, sessionmaker
 
 from .domain import (
     DuplicateRecordError,
+    DailyAssetState,
+    DailyPortfolioState,
+    DataQualityStatus,
     Experiment,
+    ExperimentEvent,
     ExperimentMode,
     ExperimentStatus,
+    ImmutableRecordError,
     OptimizationSnapshot,
+    PriceDataStatus,
+    PriceObservation,
     RecordNotFoundError,
     SnapshotAllocation,
     ensure_utc,
@@ -25,9 +34,21 @@ from .domain import (
 from .models import (
     ExperimentEventModel,
     ExperimentModel,
+    DailyAssetStateModel,
+    DailyPortfolioStateModel,
     OptimizationSnapshotModel,
+    PriceObservationModel,
     SnapshotAllocationModel,
 )
+
+
+@dataclass(frozen=True)
+class PersistenceCounts:
+    """Idempotent persistence outcome for a batch of explicit records."""
+
+    inserted: int = 0
+    updated: int = 0
+    skipped: int = 0
 
 
 def _database_timestamp(value: datetime | None) -> datetime | None:
@@ -75,11 +96,52 @@ class SnapshotRepository(Protocol):
     ) -> OptimizationSnapshot: ...
 
 
+class PriceRepository(Protocol):
+    """Persistence contract for explicit immutable price observations."""
+
+    def add_many(
+        self, observations: tuple[PriceObservation, ...] | list[PriceObservation]
+    ) -> PersistenceCounts: ...
+
+    def list(
+        self,
+        *,
+        symbols: tuple[str, ...] | list[str] | None = None,
+        start: date | None = None,
+        end: date | None = None,
+        source: str | None = None,
+        quote_currency: str | None = None,
+    ) -> list[PriceObservation]: ...
+
+
+class ValuationRepository(Protocol):
+    """Persistence contract for atomic daily portfolio and asset state."""
+
+    def write(self, state: DailyPortfolioState) -> str: ...
+
+    def get(
+        self, experiment_id: UUID, state_date: date
+    ) -> DailyPortfolioState | None: ...
+
+    def list(self, experiment_id: UUID) -> list[DailyPortfolioState]: ...
+
+
+class EventRepository(Protocol):
+    """Append-only experiment event contract."""
+
+    def add(self, event: ExperimentEvent) -> None: ...
+
+    def list(self, experiment_id: UUID) -> list[ExperimentEvent]: ...
+
+
 class UnitOfWork(Protocol):
     """Transaction boundary shared by monitoring services."""
 
     experiments: ExperimentRepository
     snapshots: SnapshotRepository
+    prices: PriceRepository
+    valuations: ValuationRepository
+    events: EventRepository
 
     def __enter__(self) -> UnitOfWork: ...
 
@@ -212,6 +274,189 @@ def _snapshot_from_model(model: OptimizationSnapshotModel) -> OptimizationSnapsh
         ),
         created_at=_database_timestamp(model.created_at),
         activated_at=_database_timestamp(model.activated_at),
+    )
+
+
+def _price_to_model(observation: PriceObservation) -> PriceObservationModel:
+    return PriceObservationModel(
+        symbol=observation.symbol,
+        observation_date=observation.observation_date,
+        price=observation.price,
+        quote_currency=observation.quote_currency,
+        source=observation.source,
+        retrieved_at=observation.retrieved_at,
+        data_status=observation.data_status.value,
+    )
+
+
+def _price_from_model(model: PriceObservationModel) -> PriceObservation:
+    retrieved_at = _database_timestamp(model.retrieved_at)
+    assert retrieved_at is not None
+    return PriceObservation(
+        symbol=model.symbol,
+        observation_date=model.observation_date,
+        price=model.price,
+        quote_currency=model.quote_currency,
+        source=model.source,
+        retrieved_at=retrieved_at,
+        data_status=PriceDataStatus(model.data_status),
+    )
+
+
+def _asset_state_to_model(state: DailyAssetState) -> DailyAssetStateModel:
+    return DailyAssetStateModel(
+        experiment_id=str(state.experiment_id),
+        state_date=state.state_date,
+        asset=state.asset,
+        price=state.price,
+        quantity=state.quantity,
+        market_value=state.market_value,
+        target_weight=state.target_weight,
+        current_weight=state.current_weight,
+        drift_percentage_points=state.drift_percentage_points,
+    )
+
+
+def _asset_state_from_model(
+    model: DailyAssetStateModel, *, cash_symbol: str | None = None
+) -> DailyAssetState:
+    return DailyAssetState(
+        experiment_id=UUID(model.experiment_id),
+        state_date=model.state_date,
+        asset=model.asset,
+        price=model.price,
+        quantity=model.quantity,
+        market_value=model.market_value,
+        target_weight=model.target_weight,
+        current_weight=model.current_weight,
+        drift_percentage_points=model.drift_percentage_points,
+        is_cash=cash_symbol is not None and model.asset == cash_symbol,
+    )
+
+
+def _portfolio_state_to_model(state: DailyPortfolioState) -> DailyPortfolioStateModel:
+    return DailyPortfolioStateModel(
+        experiment_id=str(state.experiment_id),
+        state_date=state.state_date,
+        nav=state.nav,
+        base_100_nav=state.base_100_nav,
+        cash_value=state.cash_value,
+        daily_return=state.daily_return,
+        cumulative_return=state.cumulative_return,
+        realized_volatility=state.realized_volatility,
+        running_peak=state.running_peak,
+        drawdown=state.drawdown,
+        maximum_drawdown=state.maximum_drawdown,
+        total_drift=state.total_drift,
+        return_interval_days=state.return_interval_days,
+        benchmark_nav=state.benchmark_nav,
+        benchmark_return=state.benchmark_return,
+        quality_metadata_json=dict(state.quality_metadata),
+        data_quality_status=state.data_quality_status.value,
+        calculation_version=state.calculation_version,
+        finalized=state.finalized,
+        created_at=state.created_at,
+        updated_at=state.updated_at,
+    )
+
+
+def _portfolio_state_from_model(
+    model: DailyPortfolioStateModel,
+    assets: list[DailyAssetStateModel],
+    *,
+    cash_symbol: str | None = None,
+) -> DailyPortfolioState:
+    created_at = _database_timestamp(model.created_at)
+    updated_at = _database_timestamp(model.updated_at)
+    assert created_at is not None and updated_at is not None
+    return DailyPortfolioState(
+        experiment_id=UUID(model.experiment_id),
+        state_date=model.state_date,
+        nav=model.nav,
+        base_100_nav=model.base_100_nav,
+        cash_value=model.cash_value,
+        daily_return=model.daily_return,
+        cumulative_return=model.cumulative_return,
+        realized_volatility=model.realized_volatility,
+        running_peak=model.running_peak,
+        drawdown=model.drawdown,
+        maximum_drawdown=model.maximum_drawdown,
+        total_drift=model.total_drift,
+        return_interval_days=model.return_interval_days,
+        benchmark_nav=model.benchmark_nav,
+        benchmark_return=model.benchmark_return,
+        quality_metadata=model.quality_metadata_json,
+        data_quality_status=DataQualityStatus(model.data_quality_status),
+        calculation_version=model.calculation_version,
+        finalized=model.finalized,
+        asset_states=tuple(
+            _asset_state_from_model(item, cash_symbol=cash_symbol)
+            for item in sorted(assets, key=lambda item: item.asset)
+        ),
+        created_at=created_at,
+        updated_at=updated_at,
+    )
+
+
+def _event_to_model(event: ExperimentEvent) -> ExperimentEventModel:
+    return ExperimentEventModel(
+        event_id=str(event.event_id),
+        experiment_id=str(event.experiment_id),
+        effective_date=event.effective_date,
+        event_type=event.event_type,
+        event_metadata_json=dict(event.event_metadata),
+        created_at=event.created_at,
+    )
+
+
+def _event_from_model(model: ExperimentEventModel) -> ExperimentEvent:
+    created_at = _database_timestamp(model.created_at)
+    assert created_at is not None
+    return ExperimentEvent(
+        event_id=UUID(model.event_id),
+        experiment_id=UUID(model.experiment_id),
+        effective_date=model.effective_date,
+        event_type=model.event_type,
+        event_metadata=model.event_metadata_json,
+        created_at=created_at,
+    )
+
+
+def _state_content(state: DailyPortfolioState) -> tuple:
+    """Comparable immutable state content excluding write timestamps."""
+    return (
+        state.experiment_id,
+        state.state_date,
+        state.data_quality_status,
+        state.calculation_version,
+        state.finalized,
+        state.nav,
+        state.base_100_nav,
+        state.cash_value,
+        state.daily_return,
+        state.cumulative_return,
+        state.realized_volatility,
+        state.running_peak,
+        state.drawdown,
+        state.maximum_drawdown,
+        state.total_drift,
+        state.return_interval_days,
+        state.benchmark_nav,
+        state.benchmark_return,
+        tuple(sorted(state.quality_metadata.items())),
+        tuple(
+            (
+                item.asset,
+                item.price,
+                item.quantity,
+                item.market_value,
+                item.target_weight,
+                item.current_weight,
+                item.drift_percentage_points,
+                item.is_cash,
+            )
+            for item in sorted(state.asset_states, key=lambda item: item.asset)
+        ),
     )
 
 
@@ -396,6 +641,263 @@ class SqlAlchemySnapshotRepository:
         return activated
 
 
+class SqlAlchemyPriceRepository:
+    """SQLAlchemy adapter for explicit, non-forward-filled prices."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add_many(
+        self, observations: tuple[PriceObservation, ...] | list[PriceObservation]
+    ) -> PersistenceCounts:
+        inserted = 0
+        skipped = 0
+        seen: set[tuple[str, date, str, str]] = set()
+        for observation in observations:
+            natural_key = (
+                observation.symbol,
+                observation.observation_date,
+                observation.quote_currency,
+                observation.source,
+            )
+            if natural_key in seen:
+                raise DuplicateRecordError(
+                    f"duplicate price observation in input: {natural_key}"
+                )
+            seen.add(natural_key)
+            existing = self._session.scalar(
+                select(PriceObservationModel).where(
+                    PriceObservationModel.symbol == observation.symbol,
+                    PriceObservationModel.observation_date
+                    == observation.observation_date,
+                    PriceObservationModel.quote_currency
+                    == observation.quote_currency,
+                    PriceObservationModel.source == observation.source,
+                )
+            )
+            if existing is not None:
+                if (
+                    math.isclose(
+                        existing.price,
+                        observation.price,
+                        rel_tol=0.0,
+                        abs_tol=0.0,
+                    )
+                    and existing.data_status == observation.data_status.value
+                ):
+                    skipped += 1
+                    continue
+                raise ImmutableRecordError(
+                    "existing price observation differs; use the future "
+                    "audited correction workflow"
+                )
+            self._session.add(_price_to_model(observation))
+            inserted += 1
+        _flush_or_duplicate(
+            self._session,
+            "one or more price observations already exist",
+        )
+        return PersistenceCounts(inserted=inserted, skipped=skipped)
+
+    def list(
+        self,
+        *,
+        symbols: tuple[str, ...] | list[str] | None = None,
+        start: date | None = None,
+        end: date | None = None,
+        source: str | None = None,
+        quote_currency: str | None = None,
+    ) -> list[PriceObservation]:
+        statement = select(PriceObservationModel)
+        if symbols:
+            normalized = [str(item).strip().upper() for item in symbols]
+            statement = statement.where(PriceObservationModel.symbol.in_(normalized))
+        if start is not None:
+            statement = statement.where(
+                PriceObservationModel.observation_date >= start
+            )
+        if end is not None:
+            statement = statement.where(PriceObservationModel.observation_date <= end)
+        if source is not None:
+            statement = statement.where(PriceObservationModel.source == source)
+        if quote_currency is not None:
+            statement = statement.where(
+                PriceObservationModel.quote_currency == quote_currency.strip().upper()
+            )
+        statement = statement.order_by(
+            PriceObservationModel.observation_date,
+            PriceObservationModel.symbol,
+            PriceObservationModel.source,
+        )
+        return [
+            _price_from_model(model)
+            for model in self._session.scalars(statement).all()
+        ]
+
+
+class SqlAlchemyValuationRepository:
+    """SQLAlchemy adapter for atomic, idempotent daily state writes."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def _cash_symbol(self, experiment_id: UUID) -> str | None:
+        return self._session.scalar(
+            select(SnapshotAllocationModel.asset)
+            .join(
+                OptimizationSnapshotModel,
+                OptimizationSnapshotModel.snapshot_id
+                == SnapshotAllocationModel.snapshot_id,
+            )
+            .where(
+                OptimizationSnapshotModel.experiment_id == str(experiment_id),
+                SnapshotAllocationModel.is_cash.is_(True),
+            )
+        )
+
+    def _assets(
+        self, experiment_id: UUID, state_date: date
+    ) -> list[DailyAssetStateModel]:
+        statement = select(DailyAssetStateModel).where(
+            DailyAssetStateModel.experiment_id == str(experiment_id),
+            DailyAssetStateModel.state_date == state_date,
+        )
+        return list(self._session.scalars(statement).all())
+
+    def write(self, state: DailyPortfolioState) -> str:
+        if self._session.get(ExperimentModel, str(state.experiment_id)) is None:
+            raise RecordNotFoundError(
+                f"experiment {state.experiment_id} does not exist"
+            )
+        key = (str(state.experiment_id), state.state_date)
+        existing = self._session.get(DailyPortfolioStateModel, key)
+        if existing is not None:
+            restored = _portfolio_state_from_model(
+                existing,
+                self._assets(state.experiment_id, state.state_date),
+                cash_symbol=self._cash_symbol(state.experiment_id),
+            )
+            if _state_content(restored) == _state_content(state):
+                return "skipped"
+            if existing.finalized:
+                raise ImmutableRecordError(
+                    "finalized daily portfolio state cannot be overwritten"
+                )
+            self._session.execute(
+                delete(DailyAssetStateModel).where(
+                    DailyAssetStateModel.experiment_id == str(state.experiment_id),
+                    DailyAssetStateModel.state_date == state.state_date,
+                )
+            )
+            replacement = _portfolio_state_to_model(state)
+            for column in (
+                "nav",
+                "base_100_nav",
+                "cash_value",
+                "daily_return",
+                "cumulative_return",
+                "realized_volatility",
+                "running_peak",
+                "drawdown",
+                "maximum_drawdown",
+                "total_drift",
+                "return_interval_days",
+                "benchmark_nav",
+                "benchmark_return",
+                "quality_metadata_json",
+                "data_quality_status",
+                "calculation_version",
+                "finalized",
+                "updated_at",
+            ):
+                setattr(existing, column, getattr(replacement, column))
+            action = "updated"
+        else:
+            existing = _portfolio_state_to_model(state)
+            self._session.add(existing)
+            action = "inserted"
+        self._session.add_all(
+            [_asset_state_to_model(item) for item in state.asset_states]
+        )
+        self._session.add(
+            ExperimentEventModel(
+                event_id=str(uuid4()),
+                experiment_id=str(state.experiment_id),
+                effective_date=state.state_date,
+                event_type="daily_state_" + action,
+                event_metadata_json={
+                    "state_date": state.state_date.isoformat(),
+                    "quality": state.data_quality_status.value,
+                    "finalized": state.finalized,
+                },
+                created_at=state.updated_at,
+            )
+        )
+        self._session.flush()
+        return action
+
+    def get(
+        self, experiment_id: UUID, state_date: date
+    ) -> DailyPortfolioState | None:
+        model = self._session.get(
+            DailyPortfolioStateModel, (str(experiment_id), state_date)
+        )
+        if model is None:
+            return None
+        return _portfolio_state_from_model(
+            model,
+            self._assets(experiment_id, state_date),
+            cash_symbol=self._cash_symbol(experiment_id),
+        )
+
+    def list(self, experiment_id: UUID) -> list[DailyPortfolioState]:
+        statement = (
+            select(DailyPortfolioStateModel)
+            .where(DailyPortfolioStateModel.experiment_id == str(experiment_id))
+            .order_by(DailyPortfolioStateModel.state_date)
+        )
+        cash_symbol = self._cash_symbol(experiment_id)
+        return [
+            _portfolio_state_from_model(
+                model,
+                self._assets(experiment_id, model.state_date),
+                cash_symbol=cash_symbol,
+            )
+            for model in self._session.scalars(statement).all()
+        ]
+
+
+class SqlAlchemyEventRepository:
+    """SQLAlchemy adapter for append-only audit events."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add(self, event: ExperimentEvent) -> None:
+        if self._session.get(ExperimentModel, str(event.experiment_id)) is None:
+            raise RecordNotFoundError(
+                f"experiment {event.experiment_id} does not exist"
+            )
+        if self._session.get(ExperimentEventModel, str(event.event_id)) is not None:
+            raise DuplicateRecordError(f"event {event.event_id} already exists")
+        self._session.add(_event_to_model(event))
+        _flush_or_duplicate(self._session, f"event {event.event_id} already exists")
+
+    def list(self, experiment_id: UUID) -> list[ExperimentEvent]:
+        statement = (
+            select(ExperimentEventModel)
+            .where(ExperimentEventModel.experiment_id == str(experiment_id))
+            .order_by(
+                ExperimentEventModel.created_at,
+                ExperimentEventModel.event_id,
+            )
+        )
+        return [
+            _event_from_model(model)
+            for model in self._session.scalars(statement).all()
+        ]
+
+
 class SqlAlchemyUnitOfWork:
     """Explicit commit/rollback boundary for SQLAlchemy repositories."""
 
@@ -404,11 +906,17 @@ class SqlAlchemyUnitOfWork:
         self.session: Session | None = None
         self.experiments: SqlAlchemyExperimentRepository
         self.snapshots: SqlAlchemySnapshotRepository
+        self.prices: SqlAlchemyPriceRepository
+        self.valuations: SqlAlchemyValuationRepository
+        self.events: SqlAlchemyEventRepository
 
     def __enter__(self) -> SqlAlchemyUnitOfWork:
         self.session = self._session_factory()
         self.experiments = SqlAlchemyExperimentRepository(self.session)
         self.snapshots = SqlAlchemySnapshotRepository(self.session)
+        self.prices = SqlAlchemyPriceRepository(self.session)
+        self.valuations = SqlAlchemyValuationRepository(self.session)
+        self.events = SqlAlchemyEventRepository(self.session)
         return self
 
     def __exit__(

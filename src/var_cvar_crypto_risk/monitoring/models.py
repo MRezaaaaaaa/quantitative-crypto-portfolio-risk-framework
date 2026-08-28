@@ -238,6 +238,7 @@ class DailyPortfolioStateModel(Base):
     )
     state_date: Mapped[date] = mapped_column(Date, primary_key=True)
     nav: Mapped[float | None] = mapped_column(Float)
+    base_100_nav: Mapped[float | None] = mapped_column(Float)
     cash_value: Mapped[float | None] = mapped_column(Float)
     daily_return: Mapped[float | None] = mapped_column(Float)
     cumulative_return: Mapped[float | None] = mapped_column(Float)
@@ -245,8 +246,13 @@ class DailyPortfolioStateModel(Base):
     running_peak: Mapped[float | None] = mapped_column(Float)
     drawdown: Mapped[float | None] = mapped_column(Float)
     maximum_drawdown: Mapped[float | None] = mapped_column(Float)
+    total_drift: Mapped[float | None] = mapped_column(Float)
+    return_interval_days: Mapped[int | None] = mapped_column(Integer)
     benchmark_nav: Mapped[float | None] = mapped_column(Float)
     benchmark_return: Mapped[float | None] = mapped_column(Float)
+    quality_metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "quality_metadata", JSON, nullable=False, default=dict
+    )
     data_quality_status: Mapped[str] = mapped_column(String(32), nullable=False)
     calculation_version: Mapped[str] = mapped_column(String(64), nullable=False)
     finalized: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -416,6 +422,33 @@ def _allocation_has_activated_parent(
     return parent is not None and parent.activated_at is not None
 
 
+def _portfolio_state_was_finalized(state: DailyPortfolioStateModel) -> bool:
+    inspected = inspect(state)
+    history = inspected.attrs.finalized.history
+    if history.deleted:
+        return bool(history.deleted[0])
+    if not history.has_changes():
+        return bool(state.finalized)
+    return False
+
+
+def _asset_has_finalized_parent(
+    session: Session, asset_state: DailyAssetStateModel
+) -> bool:
+    for candidate in session.new:
+        if isinstance(candidate, DailyPortfolioStateModel) and (
+            candidate.experiment_id == asset_state.experiment_id
+            and candidate.state_date == asset_state.state_date
+        ):
+            return False
+    with session.no_autoflush:
+        parent = session.get(
+            DailyPortfolioStateModel,
+            (asset_state.experiment_id, asset_state.state_date),
+        )
+    return parent is not None and _portfolio_state_was_finalized(parent)
+
+
 @event.listens_for(Session, "before_flush")
 def _protect_activated_snapshots(session: Session, _flush_context, _instances) -> None:
     for snapshot in set(session.dirty).union(session.deleted):
@@ -430,4 +463,22 @@ def _protect_activated_snapshots(session: Session, _flush_context, _instances) -
         ):
             raise ImmutableRecordError(
                 "allocations of an activated optimization snapshot are immutable"
+            )
+    for price in set(session.dirty).union(session.deleted):
+        if isinstance(price, PriceObservationModel):
+            raise ImmutableRecordError(
+                "explicit price observations require a future correction workflow"
+            )
+    for state in set(session.dirty).union(session.deleted):
+        if isinstance(state, DailyPortfolioStateModel) and (
+            _portfolio_state_was_finalized(state)
+        ):
+            raise ImmutableRecordError("finalized daily portfolio state is immutable")
+    asset_states = set(session.new).union(session.dirty).union(session.deleted)
+    for asset_state in asset_states:
+        if isinstance(asset_state, DailyAssetStateModel) and (
+            _asset_has_finalized_parent(session, asset_state)
+        ):
+            raise ImmutableRecordError(
+                "asset rows of a finalized daily portfolio state are immutable"
             )

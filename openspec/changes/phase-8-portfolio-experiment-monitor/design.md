@@ -279,9 +279,11 @@ Conflicting sources are never blended silently.
 #### `daily_portfolio_states`
 
 - experiment/date composite uniqueness;
-- nullable financial fields for explicitly incomplete dates: NAV, cash, daily
-  and cumulative return, realized volatility, running peak, drawdown, maximum
-  drawdown, benchmark NAV and return;
+- nullable financial fields for explicitly incomplete dates: NAV, Base-100 NAV,
+  cash, daily and cumulative return, realized volatility, running peak,
+  drawdown, maximum drawdown, total drift, benchmark NAV and return;
+- actual return-interval days plus data-quality metadata so a post-gap return is
+  not mislabeled as a one-day observation;
 - data-quality status, calculation version, finalized flag, timestamps;
 - indexes on experiment/date and data-quality status.
 

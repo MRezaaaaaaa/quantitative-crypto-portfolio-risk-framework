@@ -54,6 +54,25 @@ class ExperimentStatus(str, Enum):
     ARCHIVED = "archived"
 
 
+class DataQualityStatus(str, Enum):
+    """Portfolio-date quality without inventing missing market observations."""
+
+    COMPLETE = "complete"
+    INCOMPLETE = "incomplete"
+    MISSING = "missing"
+    PARTIAL = "partial"
+    CORRECTED = "corrected"
+
+
+class PriceDataStatus(str, Enum):
+    """Quality state for one explicit source observation."""
+
+    COMPLETE = "complete"
+    INCOMPLETE = "incomplete"
+    CORRECTED = "corrected"
+    REJECTED = "rejected"
+
+
 ALLOWED_TRANSITIONS: Mapping[ExperimentStatus, frozenset[ExperimentStatus]] = {
     ExperimentStatus.DRAFT: frozenset(
         {
@@ -400,3 +419,201 @@ class OptimizationSnapshot:
         if self.activated_at is not None:
             raise ImmutableRecordError("snapshot is already activated")
         return replace(self, activated_at=at or utc_now())
+
+
+@dataclass(frozen=True)
+class PriceObservation:
+    """One explicit, normalized price observation from a declared source."""
+
+    symbol: str
+    observation_date: date
+    price: float
+    quote_currency: str
+    source: str
+    retrieved_at: datetime
+    data_status: PriceDataStatus = PriceDataStatus.COMPLETE
+
+    def __post_init__(self) -> None:
+        symbol = self.symbol.strip().upper()
+        quote = self.quote_currency.strip().upper()
+        source = self.source.strip()
+        if not symbol or not quote or not source:
+            raise DomainValidationError(
+                "price symbol, quote_currency, and source are required"
+            )
+        if not math.isfinite(self.price) or self.price <= 0.0:
+            raise DomainValidationError("price must be finite and positive")
+        object.__setattr__(self, "symbol", symbol)
+        object.__setattr__(self, "quote_currency", quote)
+        object.__setattr__(self, "source", source)
+        object.__setattr__(
+            self, "retrieved_at", ensure_utc(self.retrieved_at, "retrieved_at")
+        )
+
+
+@dataclass(frozen=True)
+class DailyAssetState:
+    """One fixed-quantity asset valuation within a monitoring date."""
+
+    experiment_id: UUID
+    state_date: date
+    asset: str
+    quantity: float
+    target_weight: float
+    price: float | None = None
+    market_value: float | None = None
+    current_weight: float | None = None
+    drift_percentage_points: float | None = None
+    is_cash: bool = False
+
+    def __post_init__(self) -> None:
+        asset = self.asset.strip().upper()
+        if not asset:
+            raise DomainValidationError("daily asset name is required")
+        for name in ("quantity", "target_weight"):
+            if not math.isfinite(float(getattr(self, name))):
+                raise DomainValidationError(f"{name} must be finite")
+        for name in (
+            "price",
+            "market_value",
+            "current_weight",
+            "drift_percentage_points",
+        ):
+            value = getattr(self, name)
+            if value is not None and not math.isfinite(float(value)):
+                raise DomainValidationError(f"{name} must be finite when present")
+        if self.price is not None and self.price <= 0.0:
+            raise DomainValidationError("asset-state price must be positive")
+        if self.is_cash and self.price is not None:
+            raise DomainValidationError("cash state must not have a market price")
+        object.__setattr__(self, "asset", asset)
+
+
+@dataclass(frozen=True)
+class DailyPortfolioState:
+    """One atomic portfolio valuation and its per-asset detail rows."""
+
+    experiment_id: UUID
+    state_date: date
+    data_quality_status: DataQualityStatus
+    calculation_version: str
+    finalized: bool
+    asset_states: tuple[DailyAssetState, ...]
+    nav: float | None = None
+    base_100_nav: float | None = None
+    cash_value: float | None = None
+    daily_return: float | None = None
+    cumulative_return: float | None = None
+    realized_volatility: float | None = None
+    running_peak: float | None = None
+    drawdown: float | None = None
+    maximum_drawdown: float | None = None
+    total_drift: float | None = None
+    return_interval_days: int | None = None
+    benchmark_nav: float | None = None
+    benchmark_return: float | None = None
+    quality_metadata: Mapping[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
+
+    def __post_init__(self) -> None:
+        if not self.calculation_version.strip():
+            raise DomainValidationError("calculation_version is required")
+        if not self.asset_states:
+            raise DomainValidationError("at least one daily asset state is required")
+        keys = [(item.asset, item.state_date) for item in self.asset_states]
+        if len(keys) != len(set(keys)):
+            raise DomainValidationError("daily asset states must be unique")
+        if any(
+            item.experiment_id != self.experiment_id
+            or item.state_date != self.state_date
+            for item in self.asset_states
+        ):
+            raise DomainValidationError(
+                "daily asset states must share the portfolio experiment and date"
+            )
+        numeric_names = (
+            "nav",
+            "base_100_nav",
+            "cash_value",
+            "daily_return",
+            "cumulative_return",
+            "realized_volatility",
+            "running_peak",
+            "drawdown",
+            "maximum_drawdown",
+            "total_drift",
+            "benchmark_nav",
+            "benchmark_return",
+        )
+        for name in numeric_names:
+            value = getattr(self, name)
+            if value is not None and not math.isfinite(float(value)):
+                raise DomainValidationError(f"{name} must be finite when present")
+        if self.return_interval_days is not None and self.return_interval_days < 0:
+            raise DomainValidationError("return_interval_days must be non-negative")
+        if self.data_quality_status is DataQualityStatus.COMPLETE:
+            required = (
+                self.nav,
+                self.base_100_nav,
+                self.cash_value,
+                self.daily_return,
+                self.cumulative_return,
+                self.running_peak,
+                self.drawdown,
+                self.maximum_drawdown,
+                self.total_drift,
+                self.return_interval_days,
+            )
+            if any(value is None for value in required):
+                raise DomainValidationError(
+                    "complete portfolio state is missing valuation fields"
+                )
+            if not self.finalized:
+                raise DomainValidationError("complete portfolio state must be finalized")
+            if self.nav is not None and self.nav <= 0.0:
+                raise DomainValidationError("complete portfolio NAV must be positive")
+            if self.drawdown is not None and self.drawdown > 1e-12:
+                raise DomainValidationError("drawdown must not be positive")
+            if self.maximum_drawdown is not None and self.maximum_drawdown > 1e-12:
+                raise DomainValidationError("maximum_drawdown must not be positive")
+            if self.total_drift is not None and self.total_drift < -1e-12:
+                raise DomainValidationError("total_drift must not be negative")
+            current_weights = [
+                item.current_weight
+                for item in self.asset_states
+                if item.current_weight is not None
+            ]
+            if len(current_weights) != len(self.asset_states) or not math.isclose(
+                math.fsum(current_weights), 1.0, rel_tol=0.0, abs_tol=1e-8
+            ):
+                raise DomainValidationError(
+                    "complete daily asset current weights must sum to one"
+                )
+        elif self.finalized:
+            raise DomainValidationError(
+                "incomplete portfolio state must remain non-finalized"
+            )
+        object.__setattr__(self, "quality_metadata", dict(self.quality_metadata))
+        object.__setattr__(self, "created_at", ensure_utc(self.created_at, "created_at"))
+        object.__setattr__(self, "updated_at", ensure_utc(self.updated_at, "updated_at"))
+
+
+@dataclass(frozen=True)
+class ExperimentEvent:
+    """Append-only audit event returned by repository queries."""
+
+    event_id: UUID
+    experiment_id: UUID
+    event_type: str
+    event_metadata: Mapping[str, Any] = field(default_factory=dict)
+    effective_date: date | None = None
+    created_at: datetime = field(default_factory=utc_now)
+
+    def __post_init__(self) -> None:
+        event_type = self.event_type.strip()
+        if not event_type:
+            raise DomainValidationError("event_type is required")
+        object.__setattr__(self, "event_type", event_type)
+        object.__setattr__(self, "event_metadata", dict(self.event_metadata))
+        object.__setattr__(self, "created_at", ensure_utc(self.created_at, "created_at"))

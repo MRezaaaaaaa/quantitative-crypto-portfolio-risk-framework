@@ -61,7 +61,7 @@ def test_explicit_url_precedes_environment_without_leaking_credentials(
     assert "private" not in label and "example" not in label
 
 
-def test_initial_migration_creates_expected_schema_without_model_drift(
+def test_migration_head_creates_expected_schema_without_model_drift(
     tmp_path: Path,
 ) -> None:
     database_path = tmp_path / "migration.db"
@@ -75,7 +75,7 @@ def test_initial_migration_creates_expected_schema_without_model_drift(
             context = MigrationContext.configure(connection)
             assert compare_metadata(context, Base.metadata) == []
             revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
-            assert revision == "0001_phase8_monitoring"
+            assert revision == "0002_batch3_valuation"
     finally:
         engine.dispose()
 
