@@ -40,19 +40,19 @@
 
 ## Batch 2 — Persistence foundation
 
-- [ ] Add reviewed bounded SQLAlchemy and Alembic dependencies and regenerate
+- [x] Add reviewed bounded SQLAlchemy and Alembic dependencies and regenerate
       `uv.lock` without changing existing financial versions unnecessarily.
-- [ ] Add database URL configuration, sanitized logging, SQLite foreign-key and
+- [x] Add database URL configuration, sanitized logging, SQLite foreign-key and
       transaction setup.
-- [ ] Add Alembic configuration and deterministic initial migration.
-- [ ] Add domain value objects, enums, lifecycle validator, canonical JSON, and
+- [x] Add Alembic configuration and deterministic initial migration.
+- [x] Add domain value objects, enums, lifecycle validator, canonical JSON, and
       SHA-256 recipe/source hashing.
-- [ ] Add ORM models for experiments, snapshots, allocations, observations,
+- [x] Add ORM models for experiments, snapshots, allocations, observations,
       daily states, forecasts, runs, and events.
-- [ ] Add repository protocols, SQLAlchemy adapters, and unit of work.
-- [ ] Add temporary-database tests for migration, CRUD, uniqueness, foreign
+- [x] Add repository protocols, SQLAlchemy adapters, and unit of work.
+- [x] Add temporary-database tests for migration, CRUD, uniqueness, foreign
       keys, restart persistence, archive, rollback, and immutable snapshots.
-- [ ] Update `.gitignore`, `.env.example`, and public scanner for monitoring
+- [x] Update `.gitignore`, `.env.example`, and public scanner for monitoring
       databases, WAL, SHM, journals, and secret-bearing URLs.
 
 ## Batch 3 — Valuation and experiment registry

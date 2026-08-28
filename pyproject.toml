@@ -19,6 +19,8 @@ dependencies = [
     "yfinance>=0.2.36,<2",
     "python-dotenv>=1.0,<2",
     "cvxpy>=1.4,<2",
+    "SQLAlchemy>=2.0,<3",
+    "alembic>=1.13,<2",
 ]
 
 [project.optional-dependencies]

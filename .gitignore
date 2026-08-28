@@ -36,6 +36,19 @@ data/raw/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+data/monitoring/*
+!data/monitoring/.gitkeep
+
+# Local monitoring database sidecars
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
 
 # Generated analysis artifacts
 outputs/*
