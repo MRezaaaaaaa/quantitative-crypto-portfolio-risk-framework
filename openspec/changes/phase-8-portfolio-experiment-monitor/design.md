@@ -472,6 +472,25 @@ Repeated input produces no duplicate state, forecast, or event. A future end
 date creates no future realized rows. Streamlit does not run a loop or scheduler;
 an external scheduler may invoke the documented CLI command.
 
+Batch 5 implements the refresh boundary through a dependency-injected provider
+protocol. The complete-data policy is conservative: at an invocation timestamp,
+the current UTC calendar day is excluded and the effective cutoff is further
+bounded by the provider's declared completeness date and any frozen live end.
+The full secret-free recipe and symbol mapping are persisted at experiment
+creation and revalidated against their SHA-256 fingerprint before each update.
+Provider fallback is permitted only when declared in that recipe; the actual
+source, fallback flag, retrieval cutoff, and sanitized capability flags are
+stored with the run/event trail.
+
+Each invocation first commits a `running` audit record. All subsequent price,
+valuation, forecast, outcome, lifecycle, count, and completion writes share one
+financial transaction. Failure rolls that transaction back and records a new,
+sanitized failed-run outcome separately. A retry always creates a new run linked
+to the prior failure rather than mutating it. Previously finalized daily states
+provide the experiment-specific immutable price history; freshly fetched data
+is used only for the required risk lookback and new candidate dates. Fixed
+quantities and the frozen optimization snapshot are never recomputed.
+
 ## 11. Risk-monitoring contract
 
 Monitoring cadence is daily, while risk horizon is stored per experiment.
@@ -722,19 +741,24 @@ volatility, drift, drawdown, and tail loss.
 Rejected because Streamlit reruns are not a durable scheduler. The app exposes
 manual update; external infrastructure calls the one-shot CLI.
 
-## 20. Open questions carried to implementation review
+## 20. Implementation decisions and remaining questions
 
-1. Which exact source completeness rule should each provider use at the UTC-day
-   boundary? The provider adapter must answer this before Live mode ships.
-2. Should `optimal_inaccurate` be allowed automatically when residual checks
-   pass, or require an explicit user acknowledgement persisted in the event log?
-   The conservative recommendation is explicit acknowledgement.
-3. Which VaR/CVaR forecast recipes are exposed in the Phase 8 MVP? The design
+Resolved implementation decisions:
+
+- Each provider declares `complete_through`; the service also excludes the
+  current UTC day and applies the frozen experiment end before accepting a
+  realized cutoff.
+- `optimal_inaccurate` is rejected by default and requires an explicit flag in
+  the persisted optimization recipe in addition to independent residual checks.
+- A failed update is immutable. A retry creates a new run linked to the most
+  recent failed run and never resumes or rewrites the prior run.
+
+Questions remaining for later batches:
+
+1. Which VaR/CVaR forecast recipes are exposed in the Phase 8 MVP? The design
    supports existing methods, but the first UI should limit combinations to
    those with clearly matched horizon evaluation.
-4. Should a failed experiment retry resume the prior run or create a new run?
-   The design uses a new run with the same immutable experiment and event trail.
-5. SQLite supports a single-user local MVP. Concurrent updater and UI writes
+2. SQLite supports a single-user local MVP. Concurrent updater and UI writes
    need a documented lock timeout; production concurrency remains deferred.
 
 These questions do not change the point-in-time, fixed-holdings, idempotency,

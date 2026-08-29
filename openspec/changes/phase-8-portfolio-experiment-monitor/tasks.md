@@ -88,16 +88,16 @@
 
 ## Batch 5 — Live and Hybrid update
 
-- [ ] Add refreshable price-provider protocol and persistable source mappings.
-- [ ] Reject non-refreshable uploaded files for Live/Hybrid creation.
-- [ ] Add one-experiment and all-active one-shot update services.
-- [ ] Exclude partial current UTC day by default and record actual cutoff/source.
-- [ ] Append only new complete observations and preserve finalized rows.
-- [ ] Evaluate each matured VaR forecast once; leave future outcomes pending.
-- [ ] Add monitoring-run counts, sanitized failures, transaction rollback, and
+- [x] Add refreshable price-provider protocol and persistable source mappings.
+- [x] Reject non-refreshable uploaded files for Live/Hybrid creation.
+- [x] Add one-experiment and all-active one-shot update services.
+- [x] Exclude partial current UTC day by default and record actual cutoff/source.
+- [x] Append only new complete observations and preserve finalized rows.
+- [x] Evaluate each matured VaR forecast once; leave future outcomes pending.
+- [x] Add monitoring-run counts, sanitized failures, transaction rollback, and
       retry events.
-- [ ] Add idempotent CLI commands suitable for an external scheduler.
-- [ ] Add offline fake-provider tests for append, rerun, missing data, future
+- [x] Add idempotent CLI commands suitable for an external scheduler.
+- [x] Add offline fake-provider tests for append, rerun, missing data, future
       dates, rollback, and forecast evaluation.
 
 ## Batch 6 — Streamlit and Plotly monitoring

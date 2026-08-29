@@ -531,6 +531,33 @@ class OptimizationRecipe:
         return sha256_fingerprint(self.to_dict())
 
 
+def optimization_recipe_from_dict(value: Mapping[str, Any]) -> OptimizationRecipe:
+    """Reconstruct and revalidate a persisted secret-free recipe.
+
+    Persistence is deliberately JSON-shaped.  Rebuilding the dataclasses at the
+    service boundary reruns every validation rule instead of trusting mutable
+    database JSON blindly.
+    """
+    if not isinstance(value, Mapping):
+        raise DomainValidationError("persisted optimization recipe must be a mapping")
+    try:
+        cash_values = dict(value["cash"])
+        cash_values.pop("day_count", None)
+        return OptimizationRecipe(
+            assumptions=AssumptionRecipe(**dict(value["assumptions"])),
+            scenario=ScenarioRecipe(**dict(value["scenario"])),
+            optimizer=OptimizerRecipe(**dict(value["optimizer"])),
+            risk=RiskMonitoringRecipe(**dict(value["risk"])),
+            cash=CashPolicy(**cash_values),
+            source=SourceRecipe(**dict(value["source"])),
+            recipe_version=str(value["recipe_version"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise DomainValidationError(
+            "persisted optimization recipe is incomplete or invalid"
+        ) from exc
+
+
 __all__ = [
     "AssumptionRecipe",
     "CashPolicy",
@@ -539,4 +566,5 @@ __all__ = [
     "RiskMonitoringRecipe",
     "ScenarioRecipe",
     "SourceRecipe",
+    "optimization_recipe_from_dict",
 ]

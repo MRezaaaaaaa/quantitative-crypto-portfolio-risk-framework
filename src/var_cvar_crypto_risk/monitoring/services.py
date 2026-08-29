@@ -119,6 +119,7 @@ class ExperimentRegistry:
             source_metadata={
                 "source": recipe.source.to_dict(),
                 "recipe_fingerprint": recipe.fingerprint,
+                "optimization_recipe": recipe.to_dict(),
             },
         )
         with self._uow_factory() as uow:

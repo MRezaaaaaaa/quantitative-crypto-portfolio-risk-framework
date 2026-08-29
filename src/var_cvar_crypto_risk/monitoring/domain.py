@@ -81,6 +81,14 @@ class ForecastEvaluationStatus(str, Enum):
     INSUFFICIENT_WINDOW = "insufficient_window"
 
 
+class MonitoringRunStatus(str, Enum):
+    """Lifecycle of one auditable, one-shot monitoring update attempt."""
+
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
 ALLOWED_TRANSITIONS: Mapping[ExperimentStatus, frozenset[ExperimentStatus]] = {
     ExperimentStatus.DRAFT: frozenset(
         {
@@ -775,3 +783,135 @@ class ExperimentEvent:
         object.__setattr__(self, "event_type", event_type)
         object.__setattr__(self, "event_metadata", dict(self.event_metadata))
         object.__setattr__(self, "created_at", ensure_utc(self.created_at, "created_at"))
+
+
+@dataclass(frozen=True)
+class MonitoringRun:
+    """Auditable execution record kept outside the financial write transaction."""
+
+    run_id: UUID
+    experiment_id: UUID
+    run_type: str
+    status: MonitoringRunStatus
+    requested_cutoff: date | None = None
+    actual_cutoff: date | None = None
+    inserted_count: int = 0
+    updated_count: int = 0
+    skipped_count: int = 0
+    warning_count: int = 0
+    error_code: str | None = None
+    error_summary: str | None = None
+    run_metadata: Mapping[str, Any] = field(default_factory=dict)
+    started_at: datetime = field(default_factory=utc_now)
+    ended_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        run_type = self.run_type.strip().lower()
+        if not run_type:
+            raise DomainValidationError("monitoring run_type is required")
+        for name in (
+            "inserted_count",
+            "updated_count",
+            "skipped_count",
+            "warning_count",
+        ):
+            if getattr(self, name) < 0:
+                raise DomainValidationError(f"{name} must be non-negative")
+        started = ensure_utc(self.started_at, "started_at")
+        ended = (
+            ensure_utc(self.ended_at, "ended_at")
+            if self.ended_at is not None
+            else None
+        )
+        if self.status is MonitoringRunStatus.RUNNING:
+            if ended is not None or self.error_code is not None or self.error_summary is not None:
+                raise DomainValidationError(
+                    "running monitoring run cannot contain an outcome"
+                )
+        else:
+            if ended is None:
+                raise DomainValidationError("finished monitoring run requires ended_at")
+            if ended < started:
+                raise DomainValidationError("monitoring ended_at precedes started_at")
+        if self.status is MonitoringRunStatus.COMPLETED and (
+            self.error_code is not None or self.error_summary is not None
+        ):
+            raise DomainValidationError(
+                "completed monitoring run cannot contain an error"
+            )
+        if self.status is MonitoringRunStatus.FAILED and (
+            not (self.error_code or "").strip()
+            or not (self.error_summary or "").strip()
+        ):
+            raise DomainValidationError(
+                "failed monitoring run requires sanitized error fields"
+            )
+        object.__setattr__(self, "run_type", run_type)
+        object.__setattr__(self, "run_metadata", dict(self.run_metadata))
+        object.__setattr__(self, "started_at", started)
+        object.__setattr__(self, "ended_at", ended)
+
+    @classmethod
+    def start(
+        cls,
+        *,
+        experiment_id: UUID,
+        run_type: str,
+        requested_cutoff: date | None,
+        started_at: datetime | None = None,
+        run_metadata: Mapping[str, Any] | None = None,
+    ) -> MonitoringRun:
+        """Create a new attempt; retries always receive a new identity."""
+        return cls(
+            run_id=uuid4(),
+            experiment_id=experiment_id,
+            run_type=run_type,
+            status=MonitoringRunStatus.RUNNING,
+            requested_cutoff=requested_cutoff,
+            run_metadata=run_metadata or {},
+            started_at=started_at or utc_now(),
+        )
+
+    def complete(
+        self,
+        *,
+        actual_cutoff: date | None,
+        inserted_count: int,
+        updated_count: int,
+        skipped_count: int,
+        warning_count: int,
+        run_metadata: Mapping[str, Any],
+        ended_at: datetime | None = None,
+    ) -> MonitoringRun:
+        if self.status is not MonitoringRunStatus.RUNNING:
+            raise ImmutableRecordError("only a running monitoring run can complete")
+        return replace(
+            self,
+            status=MonitoringRunStatus.COMPLETED,
+            actual_cutoff=actual_cutoff,
+            inserted_count=inserted_count,
+            updated_count=updated_count,
+            skipped_count=skipped_count,
+            warning_count=warning_count,
+            run_metadata=dict(run_metadata),
+            ended_at=ended_at or utc_now(),
+        )
+
+    def fail(
+        self,
+        *,
+        error_code: str,
+        error_summary: str,
+        run_metadata: Mapping[str, Any],
+        ended_at: datetime | None = None,
+    ) -> MonitoringRun:
+        if self.status is not MonitoringRunStatus.RUNNING:
+            raise ImmutableRecordError("only a running monitoring run can fail")
+        return replace(
+            self,
+            status=MonitoringRunStatus.FAILED,
+            error_code=error_code.strip(),
+            error_summary=error_summary.strip(),
+            run_metadata=dict(run_metadata),
+            ended_at=ended_at or utc_now(),
+        )

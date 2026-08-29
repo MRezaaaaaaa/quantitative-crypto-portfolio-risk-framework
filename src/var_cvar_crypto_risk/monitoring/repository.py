@@ -19,12 +19,15 @@ from .domain import (
     DailyPortfolioState,
     DailyRiskForecast,
     DataQualityStatus,
+    DomainValidationError,
     Experiment,
     ExperimentEvent,
     ExperimentMode,
     ExperimentStatus,
     ForecastEvaluationStatus,
     ImmutableRecordError,
+    MonitoringRun,
+    MonitoringRunStatus,
     OptimizationSnapshot,
     PriceDataStatus,
     PriceObservation,
@@ -37,6 +40,7 @@ from .models import (
     DailyRiskForecastModel,
     ExperimentEventModel,
     ExperimentModel,
+    MonitoringRunModel,
     DailyAssetStateModel,
     DailyPortfolioStateModel,
     OptimizationSnapshotModel,
@@ -152,6 +156,18 @@ class ForecastRepository(Protocol):
     ) -> list[DailyRiskForecast]: ...
 
 
+class MonitoringRunRepository(Protocol):
+    """Persistence contract for auditable one-shot update attempts."""
+
+    def add(self, run: MonitoringRun) -> None: ...
+
+    def get(self, run_id: UUID) -> MonitoringRun | None: ...
+
+    def finish(self, run: MonitoringRun) -> None: ...
+
+    def list(self, experiment_id: UUID) -> list[MonitoringRun]: ...
+
+
 class UnitOfWork(Protocol):
     """Transaction boundary shared by monitoring services."""
 
@@ -161,6 +177,7 @@ class UnitOfWork(Protocol):
     valuations: ValuationRepository
     events: EventRepository
     forecasts: ForecastRepository
+    runs: MonitoringRunRepository
 
     def __enter__(self) -> UnitOfWork: ...
 
@@ -438,6 +455,48 @@ def _event_from_model(model: ExperimentEventModel) -> ExperimentEvent:
         event_type=model.event_type,
         event_metadata=model.event_metadata_json,
         created_at=created_at,
+    )
+
+
+def _run_to_model(run: MonitoringRun) -> MonitoringRunModel:
+    return MonitoringRunModel(
+        run_id=str(run.run_id),
+        experiment_id=str(run.experiment_id),
+        run_type=run.run_type,
+        status=run.status.value,
+        requested_cutoff=run.requested_cutoff,
+        actual_cutoff=run.actual_cutoff,
+        started_at=run.started_at,
+        ended_at=run.ended_at,
+        inserted_count=run.inserted_count,
+        updated_count=run.updated_count,
+        skipped_count=run.skipped_count,
+        warning_count=run.warning_count,
+        error_code=run.error_code,
+        error_summary=run.error_summary,
+        run_metadata_json=dict(run.run_metadata),
+    )
+
+
+def _run_from_model(model: MonitoringRunModel) -> MonitoringRun:
+    started_at = _database_timestamp(model.started_at)
+    assert started_at is not None
+    return MonitoringRun(
+        run_id=UUID(model.run_id),
+        experiment_id=UUID(model.experiment_id),
+        run_type=model.run_type,
+        status=MonitoringRunStatus(model.status),
+        requested_cutoff=model.requested_cutoff,
+        actual_cutoff=model.actual_cutoff,
+        inserted_count=model.inserted_count,
+        updated_count=model.updated_count,
+        skipped_count=model.skipped_count,
+        warning_count=model.warning_count,
+        error_code=model.error_code,
+        error_summary=model.error_summary,
+        run_metadata=model.run_metadata_json,
+        started_at=started_at,
+        ended_at=_database_timestamp(model.ended_at),
     )
 
 
@@ -1097,6 +1156,69 @@ class SqlAlchemyForecastRepository:
         ]
 
 
+class SqlAlchemyMonitoringRunRepository:
+    """SQLAlchemy adapter for one immutable-start, single-outcome run record."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add(self, run: MonitoringRun) -> None:
+        if self._session.get(ExperimentModel, str(run.experiment_id)) is None:
+            raise RecordNotFoundError(
+                f"experiment {run.experiment_id} does not exist"
+            )
+        if self._session.get(MonitoringRunModel, str(run.run_id)) is not None:
+            raise DuplicateRecordError(f"monitoring run {run.run_id} already exists")
+        if run.status is not MonitoringRunStatus.RUNNING:
+            raise DomainValidationError("new monitoring run must be running")
+        self._session.add(_run_to_model(run))
+        _flush_or_duplicate(self._session, f"monitoring run {run.run_id} already exists")
+
+    def get(self, run_id: UUID) -> MonitoringRun | None:
+        model = self._session.get(MonitoringRunModel, str(run_id))
+        return _run_from_model(model) if model is not None else None
+
+    def finish(self, run: MonitoringRun) -> None:
+        if run.status is MonitoringRunStatus.RUNNING:
+            raise DomainValidationError("finished monitoring run cannot remain running")
+        model = self._session.get(MonitoringRunModel, str(run.run_id))
+        if model is None:
+            raise RecordNotFoundError(f"monitoring run {run.run_id} does not exist")
+        current = _run_from_model(model)
+        if current.status is not MonitoringRunStatus.RUNNING:
+            if current == run:
+                return
+            raise ImmutableRecordError("finished monitoring run is immutable")
+        if current.experiment_id != run.experiment_id or current.run_type != run.run_type:
+            raise ImmutableRecordError("monitoring run identity fields cannot change")
+        replacement = _run_to_model(run)
+        for column in (
+            "status",
+            "actual_cutoff",
+            "ended_at",
+            "inserted_count",
+            "updated_count",
+            "skipped_count",
+            "warning_count",
+            "error_code",
+            "error_summary",
+            "run_metadata_json",
+        ):
+            setattr(model, column, getattr(replacement, column))
+        self._session.flush()
+
+    def list(self, experiment_id: UUID) -> list[MonitoringRun]:
+        statement = (
+            select(MonitoringRunModel)
+            .where(MonitoringRunModel.experiment_id == str(experiment_id))
+            .order_by(MonitoringRunModel.started_at, MonitoringRunModel.run_id)
+        )
+        return [
+            _run_from_model(model)
+            for model in self._session.scalars(statement).all()
+        ]
+
+
 class SqlAlchemyEventRepository:
     """SQLAlchemy adapter for append-only audit events."""
 
@@ -1140,6 +1262,7 @@ class SqlAlchemyUnitOfWork:
         self.valuations: SqlAlchemyValuationRepository
         self.forecasts: SqlAlchemyForecastRepository
         self.events: SqlAlchemyEventRepository
+        self.runs: SqlAlchemyMonitoringRunRepository
 
     def __enter__(self) -> SqlAlchemyUnitOfWork:
         self.session = self._session_factory()
@@ -1149,6 +1272,7 @@ class SqlAlchemyUnitOfWork:
         self.valuations = SqlAlchemyValuationRepository(self.session)
         self.forecasts = SqlAlchemyForecastRepository(self.session)
         self.events = SqlAlchemyEventRepository(self.session)
+        self.runs = SqlAlchemyMonitoringRunRepository(self.session)
         return self
 
     def __exit__(

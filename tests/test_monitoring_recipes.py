@@ -13,6 +13,7 @@ from var_cvar_crypto_risk.monitoring.recipes import (
     RiskMonitoringRecipe,
     ScenarioRecipe,
     SourceRecipe,
+    optimization_recipe_from_dict,
 )
 
 
@@ -40,6 +41,23 @@ def test_recipe_mapping_is_deeply_non_assignable() -> None:
     recipe = AssumptionRecipe(manual_views={"BTC": 0.01})
     with pytest.raises(TypeError):
         recipe.manual_views["BTC"] = 0.5  # type: ignore[index]
+
+
+def test_persisted_recipe_round_trip_revalidates_identical_fingerprint() -> None:
+    recipe = OptimizationRecipe(
+        source=SourceRecipe(
+            provider="fixture",
+            symbol_mapping={"BTC": "bitcoin", "ETH": "ethereum"},
+            refreshable=True,
+            metadata={
+                "fallback_provider": "yfinance",
+                "fallback_symbol_mapping": {"BTC": "BTC-USD", "ETH": "ETH-USD"},
+            },
+        )
+    )
+    restored = optimization_recipe_from_dict(recipe.to_dict())
+    assert restored.to_dict() == recipe.to_dict()
+    assert restored.fingerprint == recipe.fingerprint
 
 
 @pytest.mark.parametrize(

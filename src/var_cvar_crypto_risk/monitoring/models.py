@@ -380,6 +380,9 @@ class MonitoringRunModel(Base):
     warning_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error_code: Mapped[str | None] = mapped_column(String(64))
     error_summary: Mapped[str | None] = mapped_column(Text)
+    run_metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "run_metadata", JSON, nullable=False, default=dict
+    )
 
 
 class ExperimentEventModel(Base):

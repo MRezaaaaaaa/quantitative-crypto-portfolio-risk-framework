@@ -95,7 +95,8 @@ change is part of this design-only batch.
 
 ## Delivery gates
 
-This change is delivered in reviewed batches. The current authorized batch is
-design only: proposal, design, task plan, and capability requirements. Python,
-Streamlit, database, migration, dependency, test, and runtime changes begin only
-after this design is reviewed.
+This change is delivered in reviewed batches. Batches 1–5 cover the reviewed
+architecture, persistence, registry/valuation, Historical OOS replay, and
+Live/Hybrid one-shot update engine. Streamlit/Plotly presentation remains
+separately gated in Batch 6; final documentation and release verification remain
+Batch 7. No batch implies merge, release, deployment, or live trading.
