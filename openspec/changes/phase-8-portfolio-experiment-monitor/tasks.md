@@ -73,17 +73,17 @@
 
 ## Batch 4 — Historical Out-of-Sample Replay
 
-- [ ] Add training/cutoff/launch/evaluation boundary validation.
-- [ ] Rebuild optimization from the training slice; reject session-state result
+- [x] Add training/cutoff/launch/evaluation boundary validation.
+- [x] Rebuild optimization from the training slice; reject session-state result
       reuse for Historical and Hybrid modes.
-- [ ] Record maximum input dates for every optimizer input and assert they do not
+- [x] Record maximum input dates for every optimizer input and assert they do not
       exceed `optimization_as_of`.
-- [ ] Reveal evaluation observations sequentially through the shared valuation
+- [x] Reveal evaluation observations sequentially through the shared valuation
       workflow.
-- [ ] Add origin-safe risk forecast creation and matured-outcome evaluation.
-- [ ] Complete Historical experiments and transition Hybrid experiments to
+- [x] Add origin-safe risk forecast creation and matured-outcome evaluation.
+- [x] Complete Historical experiments and transition Hybrid experiments to
       Active at the exact boundary.
-- [ ] Add tests proving post-cutoff changes cannot alter the snapshot, launch
+- [x] Add tests proving post-cutoff changes cannot alter the snapshot, launch
       return is zero, replay is deterministic, and no future frame leaks.
 
 ## Batch 5 — Live and Hybrid update

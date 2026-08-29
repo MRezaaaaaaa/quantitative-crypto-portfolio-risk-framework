@@ -330,6 +330,12 @@ class DailyRiskForecastModel(Base):
     confidence_level: Mapped[float] = mapped_column(Float, nullable=False)
     horizon_construction: Mapped[str] = mapped_column(String(64), nullable=False)
     convention_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    portfolio_definition: Mapped[str | None] = mapped_column(String(64))
+    input_max_date: Mapped[date | None] = mapped_column(Date)
+    input_data_hash: Mapped[str | None] = mapped_column(String(64))
+    forecast_metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "forecast_metadata", JSON, nullable=False, default=dict
+    )
     forecast_var: Mapped[float | None] = mapped_column(Float)
     forecast_cvar: Mapped[float | None] = mapped_column(Float)
     forecast_volatility: Mapped[float | None] = mapped_column(Float)
@@ -432,6 +438,16 @@ def _portfolio_state_was_finalized(state: DailyPortfolioStateModel) -> bool:
     return False
 
 
+def _forecast_was_evaluated(forecast: DailyRiskForecastModel) -> bool:
+    inspected = inspect(forecast)
+    history = inspected.attrs.evaluation_status.history
+    if history.deleted:
+        return history.deleted[0] == "evaluated"
+    if not history.has_changes():
+        return forecast.evaluation_status == "evaluated"
+    return False
+
+
 def _asset_has_finalized_parent(
     session: Session, asset_state: DailyAssetStateModel
 ) -> bool:
@@ -474,6 +490,11 @@ def _protect_activated_snapshots(session: Session, _flush_context, _instances) -
             _portfolio_state_was_finalized(state)
         ):
             raise ImmutableRecordError("finalized daily portfolio state is immutable")
+    for forecast in set(session.dirty).union(session.deleted):
+        if isinstance(forecast, DailyRiskForecastModel) and _forecast_was_evaluated(
+            forecast
+        ):
+            raise ImmutableRecordError("evaluated daily risk forecast is immutable")
     asset_states = set(session.new).union(session.dirty).union(session.deleted)
     for asset_state in asset_states:
         if isinstance(asset_state, DailyAssetStateModel) and (

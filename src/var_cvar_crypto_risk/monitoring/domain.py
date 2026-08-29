@@ -73,6 +73,14 @@ class PriceDataStatus(str, Enum):
     REJECTED = "rejected"
 
 
+class ForecastEvaluationStatus(str, Enum):
+    """Lifecycle for one origin-safe risk forecast."""
+
+    PENDING = "pending"
+    EVALUATED = "evaluated"
+    INSUFFICIENT_WINDOW = "insufficient_window"
+
+
 ALLOWED_TRANSITIONS: Mapping[ExperimentStatus, frozenset[ExperimentStatus]] = {
     ExperimentStatus.DRAFT: frozenset(
         {
@@ -597,6 +605,156 @@ class DailyPortfolioState:
         object.__setattr__(self, "quality_metadata", dict(self.quality_metadata))
         object.__setattr__(self, "created_at", ensure_utc(self.created_at, "created_at"))
         object.__setattr__(self, "updated_at", ensure_utc(self.updated_at, "updated_at"))
+
+
+@dataclass(frozen=True)
+class DailyRiskForecast:
+    """One horizon-aligned VaR/CVaR forecast and optional matured outcome."""
+
+    forecast_id: UUID
+    experiment_id: UUID
+    origin_date: date
+    target_date: date
+    horizon_days: int
+    evaluation_mode: str
+    estimation_window: int
+    var_method: str
+    cvar_method: str
+    confidence_level: float
+    horizon_construction: str
+    convention_version: str
+    model_version: str
+    portfolio_definition: str
+    input_max_date: date
+    input_data_hash: str
+    evaluation_status: ForecastEvaluationStatus
+    forecast_var: float | None = None
+    forecast_cvar: float | None = None
+    forecast_volatility: float | None = None
+    realized_horizon_loss: float | None = None
+    var_breach: bool | None = None
+    forecast_metadata: Mapping[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=utc_now)
+    evaluated_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        if self.target_date <= self.origin_date:
+            raise DomainValidationError("forecast target_date must follow origin_date")
+        if self.horizon_days < 1:
+            raise DomainValidationError("forecast horizon_days must be positive")
+        if self.estimation_window < 2:
+            raise DomainValidationError("forecast estimation_window must be at least two")
+        if self.input_max_date > self.origin_date:
+            raise DomainValidationError("forecast inputs must not exceed origin_date")
+        if not _SHA256_PATTERN.fullmatch(self.input_data_hash):
+            raise DomainValidationError("input_data_hash must be a lowercase SHA-256 hash")
+        if not (0.0 < self.confidence_level < 1.0):
+            raise DomainValidationError("forecast confidence_level must be in (0, 1)")
+        required_text = {
+            "evaluation_mode": self.evaluation_mode,
+            "var_method": self.var_method,
+            "cvar_method": self.cvar_method,
+            "horizon_construction": self.horizon_construction,
+            "convention_version": self.convention_version,
+            "model_version": self.model_version,
+            "portfolio_definition": self.portfolio_definition,
+        }
+        for label, value in required_text.items():
+            if not value.strip():
+                raise DomainValidationError(f"{label} is required")
+        for name in (
+            "forecast_var",
+            "forecast_cvar",
+            "forecast_volatility",
+            "realized_horizon_loss",
+        ):
+            value = getattr(self, name)
+            if value is not None and not math.isfinite(float(value)):
+                raise DomainValidationError(f"{name} must be finite when present")
+        forecast_values = (
+            self.forecast_var,
+            self.forecast_cvar,
+            self.forecast_volatility,
+        )
+        if self.evaluation_status is ForecastEvaluationStatus.INSUFFICIENT_WINDOW:
+            if any(value is not None for value in forecast_values):
+                raise DomainValidationError(
+                    "insufficient-window forecast must not contain risk estimates"
+                )
+            if self.realized_horizon_loss is not None or self.var_breach is not None:
+                raise DomainValidationError(
+                    "insufficient-window forecast must not contain an outcome"
+                )
+        else:
+            if any(value is None for value in forecast_values):
+                raise DomainValidationError(
+                    "pending or evaluated forecast requires VaR, CVaR, and volatility"
+                )
+            if self.forecast_volatility is not None and self.forecast_volatility < 0:
+                raise DomainValidationError("forecast_volatility must not be negative")
+        if self.evaluation_status is ForecastEvaluationStatus.PENDING:
+            if (
+                self.realized_horizon_loss is not None
+                or self.var_breach is not None
+                or self.evaluated_at is not None
+            ):
+                raise DomainValidationError("pending forecast must not contain an outcome")
+        elif self.evaluation_status is ForecastEvaluationStatus.EVALUATED:
+            if (
+                self.realized_horizon_loss is None
+                or self.var_breach is None
+                or self.evaluated_at is None
+            ):
+                raise DomainValidationError(
+                    "evaluated forecast requires loss, breach flag, and timestamp"
+                )
+            expected_breach = self.realized_horizon_loss > float(self.forecast_var)
+            if self.var_breach is not expected_breach:
+                raise DomainValidationError(
+                    "VaR breach must compare realized loss only with forecast VaR"
+                )
+        elif self.evaluated_at is not None:
+            raise DomainValidationError(
+                "only an evaluated forecast may contain evaluated_at"
+            )
+        object.__setattr__(self, "evaluation_mode", self.evaluation_mode.strip().lower())
+        object.__setattr__(self, "var_method", self.var_method.strip().lower())
+        object.__setattr__(self, "cvar_method", self.cvar_method.strip().lower())
+        object.__setattr__(
+            self, "horizon_construction", self.horizon_construction.strip().lower()
+        )
+        object.__setattr__(
+            self, "portfolio_definition", self.portfolio_definition.strip().lower()
+        )
+        object.__setattr__(self, "forecast_metadata", dict(self.forecast_metadata))
+        object.__setattr__(self, "created_at", ensure_utc(self.created_at, "created_at"))
+        if self.evaluated_at is not None:
+            object.__setattr__(
+                self, "evaluated_at", ensure_utc(self.evaluated_at, "evaluated_at")
+            )
+
+    @classmethod
+    def create(cls, *, experiment_id: UUID, **kwargs: Any) -> DailyRiskForecast:
+        """Create a forecast with a stable identity before persistence."""
+        return cls(forecast_id=uuid4(), experiment_id=experiment_id, **kwargs)
+
+    def evaluate(
+        self, realized_horizon_loss: float, *, at: datetime | None = None
+    ) -> DailyRiskForecast:
+        """Return an evaluated copy; CVaR is never treated as a breach threshold."""
+        if self.evaluation_status is not ForecastEvaluationStatus.PENDING:
+            raise ImmutableRecordError("only a pending forecast can be evaluated")
+        loss = float(realized_horizon_loss)
+        if not math.isfinite(loss):
+            raise DomainValidationError("realized_horizon_loss must be finite")
+        assert self.forecast_var is not None
+        return replace(
+            self,
+            evaluation_status=ForecastEvaluationStatus.EVALUATED,
+            realized_horizon_loss=loss,
+            var_breach=loss > self.forecast_var,
+            evaluated_at=at or utc_now(),
+        )
 
 
 @dataclass(frozen=True)

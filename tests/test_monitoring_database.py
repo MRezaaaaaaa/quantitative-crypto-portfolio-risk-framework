@@ -75,7 +75,7 @@ def test_migration_head_creates_expected_schema_without_model_drift(
             context = MigrationContext.configure(connection)
             assert compare_metadata(context, Base.metadata) == []
             revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
-            assert revision == "0002_batch3_valuation"
+            assert revision == "0003_batch4_forecast"
     finally:
         engine.dispose()
 

@@ -439,6 +439,17 @@ Vectorized calculation is permitted only inside a single origin's already
 available estimation slice. The replay loop owns information revelation and
 prevents a full future frame from entering an estimator.
 
+Batch 4 implements this as a calendar-daily crypto replay. Forecast targets are
+`origin + horizon_days`; non-overlapping origins are anchored to launch and
+spaced by that calendar horizon. Each risk estimate uses the last configured
+number of daily Simple returns through the origin, applies the origin's current
+drifted weights, and constructs rolling compounded horizon returns without
+square-root scaling. Multi-day estimator samples are therefore overlapping and
+carry an explicit dependence warning. A missing target observation is never
+forward-filled; its forecast remains pending. Snapshot content is rebuilt from
+the cutoff slice and compared with any persisted snapshot before replay, so an
+in-memory optimizer result cannot be substituted for the point-in-time build.
+
 ## 10. Live and Hybrid updates
 
 One service powers `update_experiment`, `update_all_active`, Streamlit

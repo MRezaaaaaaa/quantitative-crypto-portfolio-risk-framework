@@ -17,11 +17,13 @@ from .domain import (
     DuplicateRecordError,
     DailyAssetState,
     DailyPortfolioState,
+    DailyRiskForecast,
     DataQualityStatus,
     Experiment,
     ExperimentEvent,
     ExperimentMode,
     ExperimentStatus,
+    ForecastEvaluationStatus,
     ImmutableRecordError,
     OptimizationSnapshot,
     PriceDataStatus,
@@ -32,6 +34,7 @@ from .domain import (
     utc_now,
 )
 from .models import (
+    DailyRiskForecastModel,
     ExperimentEventModel,
     ExperimentModel,
     DailyAssetStateModel,
@@ -134,6 +137,21 @@ class EventRepository(Protocol):
     def list(self, experiment_id: UUID) -> list[ExperimentEvent]: ...
 
 
+class ForecastRepository(Protocol):
+    """Idempotent origin-safe risk forecast persistence contract."""
+
+    def write(self, forecast: DailyRiskForecast) -> str: ...
+
+    def get(self, forecast_id: UUID) -> DailyRiskForecast | None: ...
+
+    def list(
+        self,
+        experiment_id: UUID,
+        *,
+        evaluation_status: ForecastEvaluationStatus | None = None,
+    ) -> list[DailyRiskForecast]: ...
+
+
 class UnitOfWork(Protocol):
     """Transaction boundary shared by monitoring services."""
 
@@ -142,6 +160,7 @@ class UnitOfWork(Protocol):
     prices: PriceRepository
     valuations: ValuationRepository
     events: EventRepository
+    forecasts: ForecastRepository
 
     def __enter__(self) -> UnitOfWork: ...
 
@@ -419,6 +438,109 @@ def _event_from_model(model: ExperimentEventModel) -> ExperimentEvent:
         event_type=model.event_type,
         event_metadata=model.event_metadata_json,
         created_at=created_at,
+    )
+
+
+def _forecast_to_model(forecast: DailyRiskForecast) -> DailyRiskForecastModel:
+    return DailyRiskForecastModel(
+        forecast_id=str(forecast.forecast_id),
+        experiment_id=str(forecast.experiment_id),
+        origin_date=forecast.origin_date,
+        target_date=forecast.target_date,
+        horizon_days=forecast.horizon_days,
+        evaluation_mode=forecast.evaluation_mode,
+        estimation_window=forecast.estimation_window,
+        var_method=forecast.var_method,
+        cvar_method=forecast.cvar_method,
+        confidence_level=forecast.confidence_level,
+        horizon_construction=forecast.horizon_construction,
+        convention_version=forecast.convention_version,
+        portfolio_definition=forecast.portfolio_definition,
+        input_max_date=forecast.input_max_date,
+        input_data_hash=forecast.input_data_hash,
+        forecast_metadata_json=dict(forecast.forecast_metadata),
+        forecast_var=forecast.forecast_var,
+        forecast_cvar=forecast.forecast_cvar,
+        forecast_volatility=forecast.forecast_volatility,
+        realized_horizon_loss=forecast.realized_horizon_loss,
+        var_breach=forecast.var_breach,
+        evaluation_status=forecast.evaluation_status.value,
+        model_version=forecast.model_version,
+        created_at=forecast.created_at,
+        evaluated_at=forecast.evaluated_at,
+    )
+
+
+def _forecast_from_model(model: DailyRiskForecastModel) -> DailyRiskForecast:
+    created_at = _database_timestamp(model.created_at)
+    assert created_at is not None
+    if (
+        model.portfolio_definition is None
+        or model.input_max_date is None
+        or model.input_data_hash is None
+    ):
+        raise ImmutableRecordError(
+            "legacy risk forecast lacks required point-in-time provenance"
+        )
+    return DailyRiskForecast(
+        forecast_id=UUID(model.forecast_id),
+        experiment_id=UUID(model.experiment_id),
+        origin_date=model.origin_date,
+        target_date=model.target_date,
+        horizon_days=model.horizon_days,
+        evaluation_mode=model.evaluation_mode,
+        estimation_window=model.estimation_window,
+        var_method=model.var_method,
+        cvar_method=model.cvar_method,
+        confidence_level=model.confidence_level,
+        horizon_construction=model.horizon_construction,
+        convention_version=model.convention_version,
+        model_version=model.model_version,
+        portfolio_definition=model.portfolio_definition,
+        input_max_date=model.input_max_date,
+        input_data_hash=model.input_data_hash,
+        evaluation_status=ForecastEvaluationStatus(model.evaluation_status),
+        forecast_var=model.forecast_var,
+        forecast_cvar=model.forecast_cvar,
+        forecast_volatility=model.forecast_volatility,
+        realized_horizon_loss=model.realized_horizon_loss,
+        var_breach=model.var_breach,
+        forecast_metadata=model.forecast_metadata_json,
+        created_at=created_at,
+        evaluated_at=_database_timestamp(model.evaluated_at),
+    )
+
+
+def _forecast_base_content(forecast: DailyRiskForecast) -> tuple:
+    """Comparable immutable forecast inputs and estimates, excluding identity."""
+    return (
+        forecast.experiment_id,
+        forecast.origin_date,
+        forecast.target_date,
+        forecast.horizon_days,
+        forecast.evaluation_mode,
+        forecast.estimation_window,
+        forecast.var_method,
+        forecast.cvar_method,
+        forecast.confidence_level,
+        forecast.horizon_construction,
+        forecast.convention_version,
+        forecast.model_version,
+        forecast.portfolio_definition,
+        forecast.input_max_date,
+        forecast.input_data_hash,
+        forecast.forecast_var,
+        forecast.forecast_cvar,
+        forecast.forecast_volatility,
+        tuple(sorted(forecast.forecast_metadata.items())),
+    )
+
+
+def _forecast_outcome_content(forecast: DailyRiskForecast) -> tuple:
+    return (
+        forecast.evaluation_status,
+        forecast.realized_horizon_loss,
+        forecast.var_breach,
     )
 
 
@@ -867,6 +989,114 @@ class SqlAlchemyValuationRepository:
         ]
 
 
+class SqlAlchemyForecastRepository:
+    """SQLAlchemy adapter for immutable forecasts and one outcome evaluation."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    @staticmethod
+    def _natural_key_statement(forecast: DailyRiskForecast):
+        return select(DailyRiskForecastModel).where(
+            DailyRiskForecastModel.experiment_id == str(forecast.experiment_id),
+            DailyRiskForecastModel.origin_date == forecast.origin_date,
+            DailyRiskForecastModel.target_date == forecast.target_date,
+            DailyRiskForecastModel.horizon_days == forecast.horizon_days,
+            DailyRiskForecastModel.evaluation_mode == forecast.evaluation_mode,
+            DailyRiskForecastModel.var_method == forecast.var_method,
+            DailyRiskForecastModel.cvar_method == forecast.cvar_method,
+            DailyRiskForecastModel.confidence_level == forecast.confidence_level,
+            DailyRiskForecastModel.model_version == forecast.model_version,
+        )
+
+    def write(self, forecast: DailyRiskForecast) -> str:
+        if self._session.get(ExperimentModel, str(forecast.experiment_id)) is None:
+            raise RecordNotFoundError(
+                f"experiment {forecast.experiment_id} does not exist"
+            )
+        existing_model = self._session.scalar(self._natural_key_statement(forecast))
+        if existing_model is None:
+            self._session.add(_forecast_to_model(forecast))
+            action = "inserted"
+        else:
+            existing = _forecast_from_model(existing_model)
+            if _forecast_base_content(existing) != _forecast_base_content(forecast):
+                raise ImmutableRecordError(
+                    "existing risk forecast has different origin inputs or estimates"
+                )
+            if _forecast_outcome_content(existing) == _forecast_outcome_content(
+                forecast
+            ):
+                return "skipped"
+            if (
+                existing.evaluation_status is ForecastEvaluationStatus.EVALUATED
+                and forecast.evaluation_status is ForecastEvaluationStatus.PENDING
+            ):
+                return "skipped"
+            if (
+                existing.evaluation_status is not ForecastEvaluationStatus.PENDING
+                or forecast.evaluation_status is not ForecastEvaluationStatus.EVALUATED
+            ):
+                raise ImmutableRecordError(
+                    "risk forecast permits only one pending-to-evaluated transition"
+                )
+            existing_model.realized_horizon_loss = forecast.realized_horizon_loss
+            existing_model.var_breach = forecast.var_breach
+            existing_model.evaluation_status = forecast.evaluation_status.value
+            existing_model.evaluated_at = forecast.evaluated_at
+            action = "evaluated"
+        self._session.add(
+            ExperimentEventModel(
+                event_id=str(uuid4()),
+                experiment_id=str(forecast.experiment_id),
+                effective_date=(
+                    forecast.target_date if action == "evaluated" else forecast.origin_date
+                ),
+                event_type="risk_forecast_" + action,
+                event_metadata_json={
+                    "forecast_id": str(
+                        existing_model.forecast_id
+                        if existing_model is not None
+                        else forecast.forecast_id
+                    ),
+                    "origin_date": forecast.origin_date.isoformat(),
+                    "target_date": forecast.target_date.isoformat(),
+                    "status": forecast.evaluation_status.value,
+                },
+                created_at=forecast.evaluated_at or forecast.created_at,
+            )
+        )
+        _flush_or_duplicate(self._session, "risk forecast natural key already exists")
+        return action
+
+    def get(self, forecast_id: UUID) -> DailyRiskForecast | None:
+        model = self._session.get(DailyRiskForecastModel, str(forecast_id))
+        return _forecast_from_model(model) if model is not None else None
+
+    def list(
+        self,
+        experiment_id: UUID,
+        *,
+        evaluation_status: ForecastEvaluationStatus | None = None,
+    ) -> list[DailyRiskForecast]:
+        statement = select(DailyRiskForecastModel).where(
+            DailyRiskForecastModel.experiment_id == str(experiment_id)
+        )
+        if evaluation_status is not None:
+            statement = statement.where(
+                DailyRiskForecastModel.evaluation_status == evaluation_status.value
+            )
+        statement = statement.order_by(
+            DailyRiskForecastModel.origin_date,
+            DailyRiskForecastModel.target_date,
+            DailyRiskForecastModel.forecast_id,
+        )
+        return [
+            _forecast_from_model(model)
+            for model in self._session.scalars(statement).all()
+        ]
+
+
 class SqlAlchemyEventRepository:
     """SQLAlchemy adapter for append-only audit events."""
 
@@ -908,6 +1138,7 @@ class SqlAlchemyUnitOfWork:
         self.snapshots: SqlAlchemySnapshotRepository
         self.prices: SqlAlchemyPriceRepository
         self.valuations: SqlAlchemyValuationRepository
+        self.forecasts: SqlAlchemyForecastRepository
         self.events: SqlAlchemyEventRepository
 
     def __enter__(self) -> SqlAlchemyUnitOfWork:
@@ -916,6 +1147,7 @@ class SqlAlchemyUnitOfWork:
         self.snapshots = SqlAlchemySnapshotRepository(self.session)
         self.prices = SqlAlchemyPriceRepository(self.session)
         self.valuations = SqlAlchemyValuationRepository(self.session)
+        self.forecasts = SqlAlchemyForecastRepository(self.session)
         self.events = SqlAlchemyEventRepository(self.session)
         return self
 
