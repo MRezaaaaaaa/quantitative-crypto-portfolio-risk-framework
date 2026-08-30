@@ -61,6 +61,13 @@ _CONTENT_RULES: tuple[tuple[str, re.Pattern[str], str], ...] = (
         "credential-like assignment detected",
     ),
     (
+        "database_url_credentials",
+        re.compile(
+            r"(?i)\b[a-z][a-z0-9+.-]*://[^:/\s]+:[^@\s/]+@"
+        ),
+        "credential-bearing database URL detected",
+    ),
+    (
         "local_user_path",
         re.compile(r"/(?:Users|home)/[A-Za-z0-9._-]+/"),
         "local user path must not appear in public artifacts",
@@ -113,7 +120,35 @@ def scan_path(relative_path: str) -> list[Finding]:
             )
         )
 
-    private_prefixes = ("data/cache/", "data/processed/", "data/raw/", "outputs/")
+    if name.lower().endswith(
+        (
+            ".db-wal",
+            ".db-shm",
+            ".db-journal",
+            ".sqlite-wal",
+            ".sqlite-shm",
+            ".sqlite-journal",
+            ".sqlite3-wal",
+            ".sqlite3-shm",
+            ".sqlite3-journal",
+        )
+    ):
+        findings.append(
+            Finding(
+                path_text,
+                None,
+                "private_database_sidecar",
+                "database write-ahead log, shared-memory, or journal artifact",
+            )
+        )
+
+    private_prefixes = (
+        "data/cache/",
+        "data/monitoring/",
+        "data/processed/",
+        "data/raw/",
+        "outputs/",
+    )
     if path_text.endswith("/.gitkeep"):
         return findings
     if path_text.startswith(private_prefixes):

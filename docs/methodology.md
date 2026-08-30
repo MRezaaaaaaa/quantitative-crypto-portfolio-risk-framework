@@ -57,6 +57,8 @@ horizon constructions.
 | Parametric Monte Carlo | Mean multiplied by `h`, covariance multiplied by `h` | Constant moments and i.i.d. increments |
 | Robust expected returns | Estimated from the selected scenario/observation horizon | High estimation error |
 | Robust covariance | Estimated from daily returns; volatility may be displayed at `sqrt(h)` | Daily dependence may not persist |
+| Monitoring realized volatility | Expanding sample standard deviation of eligible one-calendar-day post-launch Simple returns, annualized with `sqrt(365)` | Short sample; excludes multi-day gaps |
+| Monitoring risk forecast | Origin-safe estimate for a stored future target using current drifted weights | Overlap and estimation uncertainty |
 
 ## Backtesting
 
@@ -138,6 +140,24 @@ status was successful.
 The same scenarios are generally used to estimate inputs and evaluate the
 result. Metrics are therefore in-sample estimates. Portfolio weights should not
 be described as out-of-sample performance or as the unique best portfolio.
+
+## Portfolio experiment monitoring
+
+Historical OOS and Hybrid experiments rebuild optimization from observations no
+later than `optimization_as_of`; Live Forward freezes its snapshot at creation.
+Launch occurs on the declared next complete observation, launch NAV equals
+initial capital, and launch return is zero. Post-launch quantities are fixed and
+Simple-return wealth arithmetic is used. Price moves create current-weight
+drift; no rebalancing is performed.
+
+Monitoring forecasts end their information set at the origin and use current
+drifted weights by default. Realized loss is attached only when the target
+matures. A VaR exception is `realized_loss > forecast_var`; CVaR is tail severity
+and is not an exception threshold. Historical replay reveals evaluation dates
+sequentially but remains retrospective research rather than a Live Forward Test.
+
+See [Forward testing](forward-testing.md) and
+[Portfolio monitoring](portfolio-monitoring.md).
 
 ## References
 

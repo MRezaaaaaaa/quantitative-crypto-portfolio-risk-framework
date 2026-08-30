@@ -27,6 +27,38 @@ returns.py and portfolio.py
                  plotting / exports / UI
 ```
 
+## Persistent monitoring path
+
+Phase 8 adds a separate persistence path without replacing the Risk Lab:
+
+```text
+Streamlit monitoring workspace / one-shot CLI
+                    ↓
+Experiment creation, historical replay, or live-update service
+                    ↓
+Existing assumptions / scenarios / optimization / VaR-CVaR adapters
+                    ↓
+Monitoring domain and fixed-holdings valuation
+                    ↓
+Repository protocols and SQLAlchemy unit of work
+                    ↓
+Alembic-managed SQLite database
+                    ↓
+Read-only dashboard frames → Plotly presentation / private exports
+```
+
+`src/var_cvar_crypto_risk/monitoring/` owns the experiment domain, immutable
+snapshot, repository adapters, historical/live orchestration, valuation,
+forecast evaluation, read models, charts, exports, and one-shot CLI.
+`src/var_cvar_crypto_risk/streamlit_ui/monitoring.py` composes those services.
+It does not own financial formulas, run a scheduler, or rebalance portfolios.
+
+The local database is a private operational artifact. SQLAlchemy repository and
+unit-of-work boundaries isolate persistence from domain objects; Alembic owns
+schema history. SQLite is the supported local MVP. PostgreSQL deployment,
+authentication, multi-tenancy, and high-availability operations remain outside
+the current architecture.
+
 ## Module responsibilities
 
 | Module | Responsibility |
@@ -44,7 +76,12 @@ returns.py and portfolio.py
 | `optimization.py` | Scenario construction, CVaR programs, frontier analysis, and diagnostics. |
 | `correlation.py` | Dependence diagnostics. |
 | `plotting.py`, `export.py` | Presentation-neutral figures and generated files. |
-| `app.py` | Streamlit state, orchestration, and rendering. |
+| `monitoring/domain.py`, `monitoring/recipes.py` | Experiment lifecycle, fixed recipes, and monitoring contracts. |
+| `monitoring/workflows.py`, `historical_replay.py`, `live_update.py` | Point-in-time creation, sequential replay, and bounded live append. |
+| `monitoring/valuation.py`, `risk_forecasts.py` | Fixed-quantity daily states and origin-safe risk evaluation. |
+| `monitoring/repository.py`, `models.py`, `database.py` | Persistence protocols, SQLAlchemy adapter, and transaction setup. |
+| `monitoring/dashboard.py`, `charts.py`, `exports.py` | Read-only dashboard frames, Plotly charts, and private experiment bundles. |
+| `app.py`, `streamlit_ui/` | Streamlit navigation, state, orchestration, and rendering. |
 
 ## Current technical debt
 
@@ -84,6 +121,11 @@ a stale-state risk if an input is omitted from a cache key or invalidation path.
 Future extraction should use explicit immutable request/configuration objects
 and attach data provenance to each result.
 
+Monitoring results are not stored in session state. Each experiment has a UUID,
+immutable activated optimizer snapshot, database-backed daily records, and
+audited lifecycle events. The monitoring UI consumes persisted read models and
+never treats the current Risk Lab session as an authoritative launch snapshot.
+
 ## Architectural rules
 
 1. Domain modules must not import Streamlit.
@@ -96,3 +138,9 @@ and attach data provenance to each result.
 7. Generated data, caches, and reports must remain outside version control.
 8. Parametric simulation must pass covariance governance, and optimizer success
    must pass independent residual validation before presentation as solved.
+9. Monitoring must rebuild from its declared point-in-time recipe and must not
+   reuse an unproven session-state optimizer result.
+10. Finalized daily states and activated snapshots are immutable; archive retains
+    history and hard deletion is not exposed.
+11. Streamlit performs at most a bounded update. Repeated updates belong to the
+    external one-shot CLI and an operator-controlled scheduler.

@@ -16,6 +16,9 @@ disclaimer added after analysis.
   and survivorship bias remain.
 - Mixed crypto and traditional assets have different calendars and market-close
   conventions.
+- Monitoring avoids silent forward fill, but provider completeness, UTC cutoff,
+  stale observations, symbol mapping, and later vendor corrections remain model
+  and operational risks.
 
 ## Estimation risk
 
@@ -84,7 +87,41 @@ identify economic regimes.
   it does not validate the objective, inputs, or out-of-sample portfolio.
 - Current results omit transaction costs, turnover, liquidity, capacity, taxes,
   custody risk, and execution slippage.
-- Current comparisons are not walk-forward portfolio backtests.
+- A frozen optimizer snapshot can now be evaluated by Historical OOS replay or
+  Live Forward monitoring, but this does not turn input estimates into truth or
+  eliminate research selection and multiple-testing bias.
+
+## Forward-testing and monitoring risk
+
+- Historical Out-of-Sample Replay is evaluated after the historical outcomes
+  already exist. It is not a genuine Live Forward Test, and choices influenced
+  by the evaluation period can leak knowledge into the research design.
+- Live Forward evidence begins only after a frozen launch. A short live record
+  has low power and can be dominated by one regime.
+- The asset universe is frozen from current inputs rather than reconstructed
+  from a historical eligibility database. Historical and Hybrid experiments may
+  therefore contain survivorship or selection bias.
+- Holdings remain fixed after launch. Weight drift is measured, but no
+  re-optimization or rebalancing is performed or recommended.
+- Launch and valuation use complete daily closes. These are research marks, not
+  evidence of executable fills.
+- Fees, slippage, liquidity, capacity, taxes, custody, market impact, funding,
+  and transaction constraints are absent. Reported NAV is gross of all of them.
+- Current-exposure risk forecasts use drifted weights at the origin, but their
+  expected-return, covariance, tail, and horizon assumptions remain uncertain.
+- Overlapping horizon forecasts share returns. Their exception observations are
+  not independent and must not be counted as equivalent to non-overlapping
+  evidence.
+- A missing observation produces an auditable gap rather than a fabricated
+  price. The next complete return spans multiple calendar days and is excluded
+  from the realized one-day volatility statistic.
+- Comparing many experiment dashboards and reporting only the strongest path is
+  backtest overfitting unless the search universe and rejected experiments are
+  retained.
+- Common-calendar and days-since-launch alignments answer different questions.
+  Neither controls for different market regimes, recipes, assets, or constraints.
+- Database persistence and provenance improve auditability; they do not validate
+  performance or ensure the absence of data/vendor errors.
 
 ## Communication rules
 
@@ -93,6 +130,8 @@ Do not claim that the project:
 - predicts future crypto losses accurately;
 - finds the best portfolio;
 - demonstrates outperformance;
+- calls a Historical OOS replay a live forward test;
+- treats drift as a rebalancing recommendation;
 - is Basel/FRTB compliant;
 - validates investment suitability;
 - replaces licensed data or independent model validation.
@@ -100,3 +139,7 @@ Do not claim that the project:
 Acceptable language describes the system as a research platform for comparing
 how data, horizon, distribution, and estimator assumptions affect risk and
 portfolio construction.
+
+See [Forward testing](forward-testing.md) and
+[Portfolio monitoring](portfolio-monitoring.md) for the experiment-specific
+interpretation boundary.

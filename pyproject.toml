@@ -19,10 +19,18 @@ dependencies = [
     "yfinance>=0.2.36,<2",
     "python-dotenv>=1.0,<2",
     "cvxpy>=1.4,<2",
+    "SQLAlchemy>=2.0,<3",
+    "alembic>=1.13,<2",
 ]
 
+[project.scripts]
+qcprf-monitor = "var_cvar_crypto_risk.monitoring.cli:main"
+
 [project.optional-dependencies]
-app = ["streamlit>=1.32,<2"]
+app = [
+    "streamlit>=1.32,<2",
+    "plotly>=6.9,<7",
+]
 dev = [
     "build>=1.2,<2",
     "pytest>=7.4,<10",

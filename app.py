@@ -122,6 +122,9 @@ from var_cvar_crypto_risk.risk_conventions import (  # noqa: E402
     LOSS_SPACE_CONVENTION,
     loss_value_to_money,
 )
+from var_cvar_crypto_risk.streamlit_ui import (  # noqa: E402
+    render_monitoring_workspace,
+)
 from var_cvar_crypto_risk.utils import annual_to_horizon_rate  # noqa: E402
 from var_cvar_crypto_risk.var_models import calculate_var  # noqa: E402
 from var_cvar_crypto_risk.views import (  # noqa: E402
@@ -372,6 +375,16 @@ st.set_page_config(
     page_icon="📉",
     layout="wide",
 )
+
+workspace = st.sidebar.radio(
+    "Workspace",
+    ["Risk Lab", "Portfolio Monitor"],
+    horizontal=True,
+    key="workspace",
+)
+if workspace == "Portfolio Monitor":
+    render_monitoring_workspace(PROJECT_ROOT)
+    st.stop()
 
 st.title("📉 Quantitative Crypto Portfolio Risk Framework")
 st.caption(

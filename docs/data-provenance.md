@@ -71,3 +71,18 @@ are published.
 Never commit real holdings, transactions, account identifiers, client records,
 monitoring databases, credentials, or proprietary signals. The public project
 should demonstrate the workflow with public or synthetic inputs only.
+
+## Monitoring provenance
+
+Each monitored experiment freezes a provider, quote currency, symbol mapping,
+refresh capability, information-set dates, recipe fingerprint, and source-data
+hash. Live updates persist the actual source and actual cutoff rather than
+hiding fallback or staleness. Monitoring ingestion rejects duplicate,
+non-positive, and non-finite prices and does not silently forward-fill a missing
+asset.
+
+A static uploaded CSV can create a Historical OOS experiment but is not a
+refreshable Live or Hybrid source. Live providers can revise observations, so a
+later download may not recreate an earlier live state. Preserve an approved
+private snapshot when exact auditability is required, and never publish it
+without reviewing holdings, prices, performance, and source licensing.
