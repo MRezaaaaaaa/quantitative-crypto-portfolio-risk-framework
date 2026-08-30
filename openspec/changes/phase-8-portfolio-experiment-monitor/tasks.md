@@ -125,12 +125,12 @@
       missing costs, source quality, no rebalancing, and no performance guarantee.
 - [x] Document local database, external scheduler/CLI, archive, exports, and
       private-data boundary.
-- [ ] Run full tests with coverage at least 80% on Python 3.10–3.13 in CI.
-- [ ] Run Ruff, build, clean wheel import, Streamlit smoke, strict OpenSpec,
+- [x] Run full tests with coverage at least 80% on Python 3.10–3.13 in CI.
+- [x] Run Ruff, build, clean wheel import, Streamlit smoke, strict OpenSpec,
       public/history scanners, Markdown links, and `git diff --check`.
-- [ ] Confirm no existing numerical value changed without separate methodology
+- [x] Confirm no existing numerical value changed without separate methodology
       review.
-- [ ] Confirm no database, secret, real holding, transaction, tag, deployment,
+- [x] Confirm no database, secret, real holding, transaction, tag, deployment,
       release, or package publication occurred.
-- [ ] Prepare a reviewable PR; a future release gate, not Phase 8 implementation,
+- [x] Prepare a reviewable PR; a future release gate, not Phase 8 implementation,
       decides `v1.1.0`.
