@@ -291,6 +291,13 @@ Launch-date return is zero. Complete finalized rows are immutable. An incomplete
 row may be completed later when the missing observation becomes available; that
 transition is audited.
 
+Realized volatility is an expanding, point-in-time statistic over eligible
+post-launch returns with `return_interval_days == 1`. It uses sample standard
+deviation (`ddof=1`) and crypto's disclosed `sqrt(365)` annualization. The
+launch zero and multi-day post-gap returns are excluded, and the value remains
+null until two eligible daily returns exist. This avoids look-ahead and avoids
+silently treating a multi-day move as a one-day observation.
+
 #### `daily_asset_states`
 
 - unique experiment/date/asset;
@@ -581,6 +588,12 @@ distribution exists. Never synthesize a fan from point forecasts.
 Comparison requires an explicit common-calendar intersection or days-since-
 launch alignment. Data Quality exposes missing/stale observations, actual
 source, failed runs, and last complete cutoff.
+
+The comparison read service uses the shared intersection for the selected
+policy, rebases every NAV series to 100 at that intersection's first point, and
+derives comparison return, volatility, drawdown, and breach counts only from
+that same aligned sample. Days-since-launch means actual calendar age rather
+than compressed row number, so missing dates are not disguised.
 
 ## 14. Chart contracts
 

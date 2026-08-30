@@ -236,6 +236,12 @@ cumulative return, realized volatility, running peak, drawdown, maximum
 drawdown, benchmark values, cash, per-asset value, immutable target weight,
 current weight, asset drift, and total drift.
 
+Realized volatility SHALL be the expanding sample standard deviation of
+observed one-calendar-day portfolio returns since launch, annualized by
+`sqrt(365)`. The launch-date zero return and returns spanning more than one
+calendar day SHALL NOT enter this statistic. It SHALL remain absent until two
+eligible returns exist.
+
 #### Scenario: Allocation is complete
 
 - **WHEN** a daily portfolio state is finalized
@@ -246,6 +252,12 @@ current weight, asset drift, and total drift.
 
 - **WHEN** current NAV exceeds every prior complete NAV
 - **THEN** running peak equals current NAV and drawdown equals zero
+
+#### Scenario: A missing observation creates a multi-day return
+
+- **WHEN** the next complete portfolio state spans more than one calendar day
+- **THEN** its return remains auditable but does not enter realized daily
+  volatility
 
 ### Requirement: Risk forecasts preserve origin, target, and current exposure
 

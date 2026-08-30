@@ -191,6 +191,34 @@ def test_post_gap_return_uses_previous_complete_nav_and_labels_interval() -> Non
     assert final.running_peak == pytest.approx(1_030.0)
     assert final.drawdown == pytest.approx(1_000.0 / 1_030.0 - 1.0)
     assert final.maximum_drawdown == pytest.approx(final.drawdown)
+    assert final.realized_volatility is None
+
+
+def test_realized_volatility_is_expanding_origin_safe_and_annualized() -> None:
+    experiment = _experiment()
+    frame = _prices().prices.copy()
+    frame.loc["2026-01-03", "ETH"] = 55.0
+    normalized = normalize_monitoring_prices(
+        frame, source="fixture", retrieved_at=ACTIVATED_AT
+    )
+    states = value_fixed_holdings(
+        experiment=experiment,
+        snapshot=_snapshot(experiment),
+        normalized=normalized,
+        cash_policy=CashPolicy(enabled=True),
+        calculation_version="valuation-v1",
+    )
+
+    assert states[0].realized_volatility is None
+    assert states[1].realized_volatility is None
+    eligible = pd.Series([states[1].daily_return, states[2].daily_return])
+    assert states[2].realized_volatility == pytest.approx(
+        eligible.std(ddof=1) * np.sqrt(365.0)
+    )
+    all_eligible = pd.Series([item.daily_return for item in states[1:]])
+    assert states[3].realized_volatility == pytest.approx(
+        all_eligible.std(ddof=1) * np.sqrt(365.0)
+    )
 
 
 def test_cash_is_derived_from_launch_and_is_repeatable() -> None:

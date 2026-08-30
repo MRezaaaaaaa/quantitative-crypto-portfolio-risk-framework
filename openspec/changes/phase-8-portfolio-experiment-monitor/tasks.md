@@ -102,18 +102,18 @@
 
 ## Batch 6 — Streamlit and Plotly monitoring
 
-- [ ] Add bounded Plotly dependency and retain existing Matplotlib support.
-- [ ] Add `streamlit_ui` package and minimal navigation integration in `app.py`.
-- [ ] Add Experiments list and archive-only lifecycle actions.
-- [ ] Add Create Forward Test with methodology preview and strict cutoff checks.
-- [ ] Add Portfolio Monitor snapshot, performance, risk, provenance, and
+- [x] Add bounded Plotly dependency and retain existing Matplotlib support.
+- [x] Add `streamlit_ui` package and minimal navigation integration in `app.py`.
+- [x] Add Experiments list and archive-only lifecycle actions.
+- [x] Add Create Forward Test with methodology preview and strict cutoff checks.
+- [x] Add Portfolio Monitor snapshot, performance, risk, provenance, and
       historical/live boundary views.
-- [ ] Add NAV/benchmark, 100% stacked allocation, target/current, drift,
+- [x] Add NAV/benchmark, 100% stacked allocation, target/current, drift,
       drawdown, VaR/CVaR, breach, and forecast/realized charts.
-- [ ] Add Experiment Comparison with explicit calendar or launch-age alignment.
-- [ ] Add Data Quality and manual `Update Now` views.
-- [ ] Add CSV/JSON downloads and empty/error-state UI tests.
-- [ ] Test allocation sums, stable colors, boundary markers, CVaR non-breach
+- [x] Add Experiment Comparison with explicit calendar or launch-age alignment.
+- [x] Add Data Quality and manual `Update Now` views.
+- [x] Add CSV/JSON downloads and empty/error-state UI tests.
+- [x] Test allocation sums, stable colors, boundary markers, CVaR non-breach
       semantics, and unsupported-fan suppression.
 
 ## Batch 7 — Documentation and final verification

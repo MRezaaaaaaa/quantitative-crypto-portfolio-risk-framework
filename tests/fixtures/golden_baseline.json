@@ -98,7 +98,7 @@
     ],
     "fixture": "tests/fixtures/synthetic_daily_prices.csv",
     "fixture_sha256": "2bab3fd42995c5c53aa33b3f56031591823b2800afb62d3fe6641f0f6b132cd8",
-    "lock_sha256": "6b796f670449830686c33781369be96dfbd319fa5dfda600883ccee686478c99",
+    "lock_sha256": "5e7a5b479e2abf66dd4da5246abf45d1c927a8e934bcc92f1eec3c8ddcdd4bf5",
     "price_observations": 96,
     "return_observations": 95
   },

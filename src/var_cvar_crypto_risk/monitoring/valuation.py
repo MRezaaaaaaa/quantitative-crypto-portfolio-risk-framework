@@ -187,6 +187,7 @@ def value_fixed_holdings(
     maximum_drawdown = 0.0
     previous_benchmark_nav: float | None = None
     previous_benchmark_date: date | None = None
+    eligible_daily_returns: list[float] = []
     states: list[DailyPortfolioState] = []
 
     for timestamp, row in rows.iterrows():
@@ -290,6 +291,14 @@ def value_fixed_holdings(
             raise DomainValidationError(
                 "complete post-launch state lacks a previous complete valuation"
             )
+        if interval_days == 1:
+            eligible_daily_returns.append(daily_return)
+        realized_volatility = (
+            float(pd.Series(eligible_daily_returns, dtype=float).std(ddof=1))
+            * math.sqrt(365.0)
+            if len(eligible_daily_returns) >= 2
+            else None
+        )
         running_peak = nav if running_peak is None else max(running_peak, nav)
         drawdown = nav / running_peak - 1.0
         maximum_drawdown = min(maximum_drawdown, drawdown)
@@ -345,6 +354,7 @@ def value_fixed_holdings(
             cash_value=cash_value,
             daily_return=daily_return,
             cumulative_return=nav / experiment.initial_capital - 1.0,
+            realized_volatility=realized_volatility,
             running_peak=running_peak,
             drawdown=drawdown,
             maximum_drawdown=maximum_drawdown,
