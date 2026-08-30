@@ -5,6 +5,53 @@ is based on Keep a Changelog, and the project follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Persistent named portfolio experiments with authoritative UUIDs, validated
+  lifecycle transitions, retained archive history, and event audit records.
+- Immutable point-in-time optimization snapshots containing target allocations,
+  recipes, assumptions, constraints, solver/residual state, versions, dates,
+  source hashes, and launch forecasts.
+- SQLAlchemy repository/unit-of-work boundary, Alembic migrations, and a private
+  local SQLite monitoring store configurable through a sanitized database URL.
+- Historical Out-of-Sample Replay that rebuilds through a frozen cutoff and
+  reveals evaluation observations sequentially without reusing Streamlit
+  optimizer session results.
+- Idempotent one-shot Live Forward and Hybrid update services and the
+  `qcprf-monitor` CLI for an operator-controlled external scheduler.
+- Strict monitoring-price normalization without silent forward fill, explicit
+  complete/incomplete states, actual provider/cutoff provenance, atomic writes,
+  and sanitized failure records.
+- Fixed-quantity daily NAV, benchmark, cash, current weights, allocation drift,
+  drawdown, expanding realized volatility, and origin-safe VaR/CVaR forecast
+  evaluation.
+- Private-by-default CSV/JSON experiment bundles and manifests with file hashes
+  and no database credentials or URLs.
+- Streamlit Portfolio Monitor with experiment creation/archive, methodology and
+  provenance views, Data Quality/Update Now, downloads, and explicit calendar
+  or days-since-launch comparison.
+- Plotly NAV, 100% stacked allocation, target/current, drift, drawdown,
+  VaR/CVaR, exception, forecast/realized, and experiment-comparison charts.
+- Portfolio-monitoring, forward-testing, database-operations, and user-guide
+  documentation plus updated architecture, methodology, model-risk,
+  reproducibility, data-provenance, and public-release boundaries.
+- Offline tests for migrations, persistence, immutability, rollback,
+  point-in-time replay, live append, idempotency, data quality, forecasts,
+  fixed-holdings valuation, charts, comparison alignment, UI states, and exports.
+
+### Changed
+
+- Added bounded SQLAlchemy, Alembic, and Plotly dependencies while preserving
+  the existing financial methodology and version 1.0.0 numerical golden values.
+- Split Streamlit into a default Risk Lab workspace and a persistent Portfolio
+  Monitor workspace without changing the default analytical workflow.
+
+### Security
+
+- Extended ignore and publication-boundary rules to reject monitoring databases,
+  SQLite sidecars, secret-bearing database URLs, private portfolio artifacts,
+  and local monitoring outputs.
+
 ## [1.0.0] - 2026-07-24
 
 ### Added

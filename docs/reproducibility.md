@@ -19,6 +19,10 @@ reproducibility for a synthetic methodology demonstration. A separately
 licensed, pinned real-market dataset is still required before making empirical
 claims about crypto-market behavior or performance.
 
+Phase 8 monitoring adds persistent experiment provenance on the unreleased
+development line. It does not change the version 1.0.0 publication bundle or
+convert live vendor observations into deterministic artifacts.
+
 ## Current workflow
 
 ```bash
@@ -127,6 +131,31 @@ claims boundary and article workflow.
 When `end_date` is unset, a later execution consumes a later sample. Vendors can
 also revise observations. Screenshots from live data must therefore display the
 actual data cutoff and should not be presented as exactly reproducible.
+
+## Monitoring experiment reproducibility
+
+An activated monitoring experiment preserves an authoritative UUID, the date
+boundaries, frozen optimizer recipe and target allocation, source/recipe hashes,
+package and code versions, provider mapping, risk conventions, solver state,
+independent residual validation, and daily run/event provenance. This supports
+an audit of what the framework calculated from the recorded information set.
+
+Historical OOS replay is the most repeatable monitoring mode when its full
+price input is pinned: it rebuilds through the cutoff and reveals evaluation
+observations sequentially. Determinism still requires the same input bytes,
+recipe, code/dependencies, solver environment, and tolerance policy.
+
+Live Forward and Hybrid append are not bit-for-bit reproducible from a later
+vendor request alone. Providers can revise history, change symbol coverage, or
+return a different cutoff. Preserve an approved private export or database
+backup when an exact live audit is required. Such artifacts can contain
+holdings, prices, and realized performance and must not be committed by default.
+
+The monitoring database is not the publication artifact workflow. Dashboard
+downloads are private operational exports; the synthetic publication runner
+remains the supported public reproducibility demonstration. See
+[Monitoring database and operations](monitoring-database.md) and
+[Portfolio monitoring](portfolio-monitoring.md).
 
 ## Remaining research-publication control
 

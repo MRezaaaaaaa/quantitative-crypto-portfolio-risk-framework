@@ -9,6 +9,8 @@ repository is not evidence that the workflow has run successfully.
 - [ ] Working tree is clean and the intended branch is identified.
 - [ ] Commit author name and email are suitable for public history.
 - [ ] No unrelated experiment or generated artifact is included.
+- [ ] No monitoring database, SQLite sidecar, private experiment export, real
+      holding, price history, NAV history, or scheduler log is included.
 - [ ] `uv lock --check` passes.
 - [ ] Full tests and the numerical golden baseline pass.
 - [ ] Coverage meets the current floor and does not materially regress.
@@ -50,6 +52,8 @@ Private:
 - real holdings, client or investor data, account identifiers, and transaction
   history;
 - private portfolio-monitoring databases and live NAV records;
+- monitoring exports containing target/current holdings, fixed quantities,
+  prices, risk forecasts, exceptions, or realized performance;
 - unpublished proprietary signals or strategy parameters;
 - downloaded vendor datasets without redistribution rights;
 - local paths, caches, scratch notebooks, and generated outputs.
@@ -106,3 +110,23 @@ for the exact dataset, config, commit, and claims used by each publication.
       documentation, governance, and dependencies.
 - [ ] Do not deploy, publish a package, or create a release from an unclean or
       locally modified tree.
+
+## 6. Phase 8 monitoring release gate
+
+Phase 8 implementation completion does not itself authorize a version bump,
+merge, tag, deployment, GitHub Release, or package publication. A future focused
+release review must additionally confirm:
+
+- [ ] Historical OOS, Live Forward, and Hybrid labels are accurate in the UI,
+      docs, exports, and screenshots.
+- [ ] Snapshot dates and input maximum dates prove the point-in-time boundary.
+- [ ] Monitoring migration tests pass from an empty database through head.
+- [ ] Identical live updates are idempotent and failure paths roll back related
+      financial writes.
+- [ ] No local database, WAL/SHM/journal, private bundle, or live provider output
+      appears in the candidate diff or reachable publication history.
+- [ ] Monitoring screenshots and article results use synthetic or separately
+      approved inputs and disclose fixed holdings, missing costs, source quality,
+      no rebalancing, and no performance guarantee.
+- [ ] The candidate changelog and version are reviewed in a separate release
+      commit. Until then, Phase 8 remains under `[Unreleased]`.

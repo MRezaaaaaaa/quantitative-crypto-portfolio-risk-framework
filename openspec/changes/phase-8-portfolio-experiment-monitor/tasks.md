@@ -118,12 +118,12 @@
 
 ## Batch 7 — Documentation and final verification
 
-- [ ] Update README and `CHANGELOG.md` Unreleased without bumping package version.
-- [ ] Update architecture, model-risk, reproducibility, and public-release docs.
-- [ ] Add portfolio-monitoring, forward-testing, database, and user-guide docs.
-- [ ] Document Historical OOS versus Live Forward, Hybrid, fixed holdings,
+- [x] Update README and `CHANGELOG.md` Unreleased without bumping package version.
+- [x] Update architecture, model-risk, reproducibility, and public-release docs.
+- [x] Add portfolio-monitoring, forward-testing, database, and user-guide docs.
+- [x] Document Historical OOS versus Live Forward, Hybrid, fixed holdings,
       missing costs, source quality, no rebalancing, and no performance guarantee.
-- [ ] Document local database, external scheduler/CLI, archive, exports, and
+- [x] Document local database, external scheduler/CLI, archive, exports, and
       private-data boundary.
 - [ ] Run full tests with coverage at least 80% on Python 3.10–3.13 in CI.
 - [ ] Run Ruff, build, clean wheel import, Streamlit smoke, strict OpenSpec,
