@@ -29,7 +29,7 @@ qcprf-monitor = "var_cvar_crypto_risk.monitoring.cli:main"
 [project.optional-dependencies]
 app = [
     "streamlit>=1.32,<2",
-    "plotly>=6.9,<7",
+    "plotly>=6.9,<8",
 ]
 dev = [
     "build>=1.2,<2",
