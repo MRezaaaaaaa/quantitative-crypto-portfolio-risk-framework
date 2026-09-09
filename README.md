@@ -262,6 +262,7 @@ See [CHANGELOG](CHANGELOG.md) and the specifications under `openspec/`.
 - [VaR and CVaR output contract](docs/risk-measure-contract.md)
 - [Covariance and solver governance](docs/covariance-and-solver-governance.md)
 - [Model risk](docs/model-risk.md)
+- [Manual review findings](docs/manual-review-findings.md)
 - [Data provenance](docs/data-provenance.md)
 - [Reproducibility](docs/reproducibility.md)
 - [Portfolio monitoring](docs/portfolio-monitoring.md)
