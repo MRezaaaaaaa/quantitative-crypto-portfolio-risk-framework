@@ -7,6 +7,32 @@ is based on Keep a Changelog, and the project follows Semantic Versioning.
 
 ### Added
 
+- Strictly retrospective Risk Summary sourced from the finalized selected
+  policy path, including audited net NAV/drawdown/cost cards, historical
+  descriptive/tail tables, a long-form raw/display CSV contract, policy and
+  target-weight context, and explicit source/calendar data-quality details.
+- Shared Streamlit-independent Plotly chart system for all user-facing Risk Lab
+  distributions, paths, dependence, backtesting, simulation and optimization
+  figures, with provenance metadata, browser PNG and standalone HTML export.
+- Interactive Robust Assumptions dumbbell audit comparing Raw Historical Mean
+  with Final E[r] or another already-computed estimator, including basis-point
+  differences, recipe hover details, null-safe Manual Views and explicit asset
+  ordering.
+- Default All Estimators audit mode showing the full completed return-estimator
+  range per asset with stable color/symbol identities, overlap-safe vertical
+  offsets, full-dispersion sorting and complete Plotly metadata; the prior
+  Raw-Mean pairwise comparison remains available as a separate view mode.
+
+- Versioned pure Portfolio Path V1 engine for fixed-quantity Buy & Hold and
+  explicit daily/weekly/monthly/quarterly UTC-close rebalancing, with deferred
+  missing-price events, asset-level holdings/trades/drift, accounting checks,
+  gross/one-way turnover, proportional commission/slippage and provenance.
+- Risk Lab Plotly comparisons for Hold versus selected net NAV, pre/post-trade
+  weights and event markers, turnover/cumulative costs, comparative drawdown,
+  and gross versus net NAV.
+- Deterministic portfolio-path, chart, missing-data and Streamlit policy tests,
+  including zero-cost daily equivalence to the legacy constant-weight series.
+
 - Persistent named portfolio experiments with authoritative UUIDs, validated
   lifecycle transitions, retained archive history, and event audit records.
 - Immutable point-in-time optimization snapshots containing target allocations,
@@ -41,10 +67,51 @@ is based on Keep a Changelog, and the project follows Semantic Versioning.
 
 ### Changed
 
+- Removed the redundant standalone Left-tail Zoom expander from the Distribution
+  section. The primary Plotly histogram retains its highlighted historical tail
+  and VaR/CVaR reference lines, with explicitly shared bins for exact overlay
+  alignment.
+- Removed annualized return, annualized volatility, Sharpe and duplicate
+  drawdown from the visible Risk Summary and its CSV. Historical VaR/CVaR models
+  are unchanged and now sit under an explicit Historical Tail Distribution
+  interpretation boundary.
+- Promoted Plotly to a core dependency and removed Matplotlib from the runtime
+  dependency set. Pearson/Spearman selection now also governs rolling
+  correlation instead of only the static matrix.
+
+- Risk Lab realized performance, descriptive risk, backtesting and exports now
+  use the selected explicit portfolio path. Monte Carlo/current-portfolio
+  comparisons use current end-of-path weights; current Money VaR/CVaR and
+  simulated value paths use latest net NAV rather than launch notional.
+- Risk horizon and portfolio rebalancing are separate controls. Stateful paths
+  preserve incomplete closes for audited deferral instead of silently forward-
+  filling a scheduled event. Portfolio Monitor remains manual fixed holdings.
+
+- Phase 8 monitoring creation is manual-only: explicit asset/percentage inputs
+  replace optimizer, expected-return, covariance and scenario controls. Weights
+  must total 100% without hidden normalization; fixed quantities use explicitly
+  chosen complete launch prices. No optimization runs in new experiment creation.
+- Manual snapshots use `manual_validated` and solver `none`, without fabricated
+  return forecasts. Existing optimized records remain intact and compatible;
+  Risk Lab optimization, financial formulas and database schema are unchanged.
 - Added bounded SQLAlchemy, Alembic, and Plotly dependencies while preserving
   the existing financial methodology and version 1.0.0 numerical golden values.
 - Split Streamlit into a default Risk Lab workspace and a persistent Portfolio
   Monitor workspace without changing the default analytical workflow.
+
+### Fixed
+
+- Periodic rebalance schedules now use theoretical UTC calendar boundaries.
+  Missing or incomplete weekly/monthly/quarterly boundaries defer forward to
+  the first later complete close instead of backdating to an earlier observation;
+  multiple pending boundaries are all audited but execute one trade and one cost.
+- Asset-level drawdown now includes launch wealth `1.0` as the initial peak, so
+  a first-period loss is reported immediately and consistently with NAV paths.
+- The publication workflow now uses the same explicit policy-specific historical
+  summary contract as Streamlit. Schema-v1 configs retain a recorded Buy & Hold,
+  zero-cost compatibility default.
+- Source rows dated on or after the current UTC date are retained for audit but
+  excluded from finalized historical NAV, drawdown, tail metrics, and counts.
 
 ### Security
 

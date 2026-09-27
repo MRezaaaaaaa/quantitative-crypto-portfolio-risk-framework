@@ -1,15 +1,20 @@
 # Manual Review Findings
 
-This backlog records issues identified while reviewing the application manually.
-Entries are observations and proposed acceptance criteria; they are not implemented
-changes. Financial methodology must not be changed without a separate specification,
-tests, documentation review, and numerical-regression review.
+This register records issues identified while reviewing the application manually.
+Each entry retains the original observation and records its current disposition.
+Financial methodology must not be changed without a separate specification, tests,
+documentation review, and numerical-regression review.
 
 ## MR-001 — Separate realized CAGR from annualized mean-return estimates
 
-- **Status:** Planned for the next methodology release
+- **Status:** Resolved in the visible retrospective Risk Summary by removal
 - **Priority:** P1
 - **Observed location:** Risk Lab → Risk summary → `Annualized Return`
+- **Resolution:** The authoritative policy-specific Risk Summary and its CSV no
+  longer contain `Annualized Return`. The summary reports realized ending NAV
+  and cumulative return from the audited path. No CAGR replacement was added in
+  this release. The low-level legacy summary helper is retained for backward
+  compatibility but is not used by Risk Lab or publication output.
 - **Current behavior:** The displayed value is calculated as
   `(1 + arithmetic mean daily return) ** 365 - 1`.
 - **Why this is misleading:** This compounds the same arithmetic sample mean for a
@@ -43,9 +48,13 @@ tests, documentation review, and numerical-regression review.
 
 ## MR-002 — Replace the displayed return-to-volatility ratio with a standard Sharpe ratio
 
-- **Status:** Planned for the next methodology release
+- **Status:** Resolved in the visible retrospective Risk Summary by removal
 - **Priority:** P1
 - **Observed location:** Risk Lab → Risk summary → `Sharpe Ratio (annualized)`
+- **Resolution:** The authoritative policy-specific Risk Summary and its CSV no
+  longer contain a Sharpe row. Optimizer-specific Sharpe calculations remain in
+  their separate decision-model context and were not changed. Reintroducing an
+  ex-post historical Sharpe would require a new reviewed methodology contract.
 - **Current behavior:** The displayed ratio divides the compounded mean-daily
   annualized value from MR-001 by annualized volatility and does not subtract an
   explicit risk-free return. In the reviewed example, `79.0697% / 65.9375%` produces

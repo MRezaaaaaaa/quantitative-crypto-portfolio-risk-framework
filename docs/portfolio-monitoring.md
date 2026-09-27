@@ -2,8 +2,8 @@
 
 ## Purpose
 
-The Portfolio Experiment Monitor turns one validated optimizer result into a
-persistent research experiment. It preserves the construction recipe, target
+The Portfolio Experiment Monitor turns manually entered assets and initial
+weights into a persistent research experiment. It preserves the manual recipe, target
 allocation, launch convention, daily valuations, risk forecasts, data-quality
 records, and update history. It is not an order-management, advisory, or
 rebalancing system.
@@ -14,16 +14,21 @@ downloads, and dashboard.
 
 ## Frozen construction snapshot
 
-Creation rebuilds the optimizer from the declared point-in-time data and recipe.
-It does not reuse an optimizer result held in Streamlit session state. Activation
-requires an accepted solver status and passing independent residual validation.
-The activated snapshot then freezes:
+Creation validates explicit long-only weights totaling 100%, without silent
+normalization, optimization, expected-return fitting or scenario generation.
+The user selects a completed UTC launch day with complete asset/benchmark prices;
+the date is never shifted. The activated manual snapshot freezes:
 
 - universe, target weights, cash policy, capital, and base currency;
-- expected-return, covariance, scenario, optimizer, and risk settings;
+- manual weights, price source mapping, cash and risk settings;
 - information-set dates, package/code versions, and source/recipe hashes;
-- solver status, numerical validation, launch forecast, prices, values, and
-  quantities.
+- manual validation (`manual_validated`, solver `none`), launch prices, values
+  and quantities. No expected-return prediction is invented.
+
+Existing optimized experiments remain intact for compatibility. Their original
+recipes and provenance are preserved. New UI/workflow requests are manual-only.
+Historical manual allocations can be chosen with hindsight; a declared decision
+date is not evidence that the weights were known then.
 
 The framework supports long-only fixed holdings in Phase 8. For a non-cash asset
 `i`, its launch quantity is conceptually:

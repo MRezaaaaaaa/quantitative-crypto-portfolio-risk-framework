@@ -7,15 +7,16 @@ differs by mode.
 
 | Mode | What happens | What it is not |
 |---|---|---|
-| Historical Out-of-Sample Replay | Rebuild at a past cutoff, freeze the snapshot, then reveal already-available later observations sequentially | A live forward test |
+| Historical Out-of-Sample Replay | Freeze entered manual weights and launch quantities, then reveal already-available later observations sequentially | A live forward test |
 | Live Forward Test | Freeze the snapshot at creation and append only complete observations that become available afterward | A historical backtest with a recent date label |
 | Hybrid Historical OOS + Live Forward | Replay a declared historical evaluation interval, then append future complete observations after the boundary | One homogeneous sample |
 
 Historical replay can provide out-of-sample evidence relative to its frozen
 cutoff, but the evaluation data are already known at the time the user runs the
 software. Research choices made after seeing those data can still create
-selection bias. Only Live Forward mode creates genuinely prospective evidence
-after the frozen launch.
+selection bias. Only observations arriving after the actual snapshot freeze
+provide prospective evidence. A backdated launch or Live Forward label alone
+does not establish ex-ante allocation selection.
 
 ## Point-in-time boundary
 
@@ -26,10 +27,13 @@ training_start <= training_end <= optimization_as_of
 optimization_as_of < launch_date <= historical_evaluation_end
 ```
 
-Expected-return, covariance, scenario, and optimizer inputs must end at or before
-`optimization_as_of`. Historical and Hybrid creation rebuilds from the bounded
-training data and serialized recipe. Tests perturb future observations to prove
-they cannot change the frozen snapshot or earlier forecasts.
+For new manual experiments, these legacy database names mean risk-history
+start/end and allocation decision date, not optimizer inputs. The UI uses manual
+terminology. No optimizer runs. Initial quantities use the explicitly selected
+complete launch prices; later evaluation prices cannot alter them. Daily risk
+inputs end at their own forecast origin. Historical manual weights may still
+incorporate hindsight; the framework cannot prove they were known at the declared
+decision date. Tests perturb future observations to check snapshot/forecast isolation.
 
 Launch uses the explicitly requested complete close after the information
 cutoff. Launch NAV equals initial capital and launch return is zero; performance

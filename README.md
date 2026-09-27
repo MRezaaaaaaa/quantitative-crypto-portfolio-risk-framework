@@ -34,7 +34,7 @@ performance.
 - Generates and verifies deterministic offline publication bundles with pinned
   inputs, assumptions, cutoffs, source revisions, and artifact hashes.
 - Exposes assumptions and diagnostics through an interactive Streamlit app.
-- Persists named portfolio experiments with immutable optimization snapshots,
+- Persists manually entered portfolios with immutable allocation snapshots,
   Historical OOS replay, Live Forward and Hybrid updates, fixed-holdings NAV,
   allocation drift, origin-safe risk forecasts, and data-quality history.
 - Presents monitoring results with Plotly NAV, allocation, drift, drawdown,
@@ -42,6 +42,24 @@ performance.
 - Applies a centralized return policy: Simple for portfolio/NAV/scenario/
   optimization calculations, with Log available only for advanced distribution
   diagnostics.
+- Builds Risk Lab performance from an explicit portfolio-evolution policy:
+  fixed-quantity Buy & Hold, UTC daily/weekly/monthly/quarterly rebalancing, or
+  the explicitly labeled legacy daily constant-weight policy. Rebalanced paths
+  record drift, trades, gross/one-way turnover, proportional costs, and gross
+  versus net NAV.
+- Reports a strictly retrospective, policy-specific Risk Summary from the
+  finalized audited net-NAV path, with visible source/calendar quality checks.
+- A source row dated on the current UTC day is retained for audit but excluded
+  from finalized NAV, drawdown, tail metrics, and observation counts.
+- Schedules periodic rebalances on theoretical UTC calendar boundaries and
+  never moves a missed event backward. A missing or incomplete boundary is
+  deferred to the first later complete close and remains visible in the event
+  audit; multiple pending boundaries coalesce into one trade and one cost.
+- Exports Risk Summary as a long machine-readable table with raw numeric values,
+  display values, units, sample sizes, policy/cost context, quality details, and
+  target weights from the same summary object rendered by Streamlit.
+- Uses reusable Streamlit-independent Plotly figures across Risk Lab, with
+  client-side PNG and standalone interactive HTML export.
 
 ## Important interpretation
 
@@ -108,7 +126,7 @@ Data providers / CSV
         ↓
 Cleaning and return construction
         ↓
-Portfolio aggregation
+Explicit Portfolio Path Engine
         ↓
 Risk models ─ Backtesting ─ Scenario simulation
         ↓                         ↓
@@ -121,7 +139,11 @@ Financial calculations live under `src/var_cvar_crypto_risk/`. Streamlit is a
 presentation and orchestration layer; it should not become the authoritative
 location for financial formulas.
 
-Portfolio monitoring follows a separate persistent path: point-in-time creation
+New Portfolio Monitor experiments use manually entered assets and weights only;
+no optimizer runs in monitoring creation. The independent Risk Lab optimizer
+is unchanged. Previously saved optimized experiments retain their old provenance.
+
+Portfolio monitoring follows a separate persistent path: manual creation
 or bounded update services write through a SQLAlchemy unit of work to an
 Alembic-managed local database; read-only dashboard frames feed Plotly charts.
 Streamlit does not run a scheduler or rebalance holdings. The one-shot
@@ -153,6 +175,8 @@ technical debt.
 | Area | Implemented methods | Primary module |
 |---|---|---|
 | Returns | Simple, log, realized horizon returns | `returns.py` |
+| Portfolio paths | Buy & Hold; daily, weekly, monthly, quarterly rebalancing; proportional costs | `portfolio_path.py` |
+| Retrospective summary | Audited net NAV, drawdown, costs, descriptive moments, data quality | `historical_summary.py` |
 | VaR | Historical, Gaussian, Cornish-Fisher | `var_models.py` |
 | CVaR | Historical, Gaussian | `cvar_models.py` |
 | Validation | Kupiec, Christoffersen independence and CC | `backtesting.py` |
@@ -161,6 +185,7 @@ technical debt.
 | Covariance governance | Symmetry/PSD diagnostics and deterministic repair | `covariance.py` |
 | Optimization | Minimum CVaR, CVaR cap, target return, frontier, Sharpe search | `optimization.py` |
 | Dependence | Static, rolling, weighted, stress-versus-normal correlation | `correlation.py` |
+| Risk Lab figures | Pure Plotly builders and shared visual contract | `plotting.py`, `plotly_theme.py` |
 | Portfolio monitoring | Historical OOS, Live/Hybrid append, fixed holdings, drift, forecasts, persisted comparison | `monitoring/` |
 
 Cornish-Fisher is a moment-based approximation, not a guaranteed improvement
@@ -219,8 +244,10 @@ Dependency declarations and the committed lockfile workflow are documented in
 - Expected-return estimates are noisy and can dominate optimized allocations.
 - Optimization outputs are in-sample estimates, not demonstrated out-of-sample
   strategies.
-- Transaction costs, market impact, liquidity, taxes, and execution constraints
-  are not modeled.
+- Risk Lab rebalanced paths model only user-specified proportional commission
+  and slippage on gross traded notional. They omit nonlinear market impact,
+  liquidity/capacity limits, taxes, funding, borrow costs, custody, and actual
+  fill uncertainty. Portfolio Monitor remains gross fixed-holdings valuation.
 - Monitoring values fixed post-launch quantities and measures drift; it does not
   re-optimize, rebalance, submit orders, or demonstrate executable fills.
 - Historical OOS replay is retrospective and may contain research-selection,

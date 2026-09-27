@@ -13,6 +13,11 @@ supported version ranges.
 - `requirements.txt` and `requirements-dev.txt` are thin compatibility entry
   points; they must not duplicate package versions.
 
+Plotly is a core dependency because public chart builders return reusable
+`plotly.graph_objects.Figure` objects outside Streamlit. Matplotlib is not a
+runtime dependency. PNG export uses Plotly.js in the browser modebar, so Kaleido
+is not required; standalone HTML embeds Plotly.js for portability.
+
 Install the application with:
 
 ```bash

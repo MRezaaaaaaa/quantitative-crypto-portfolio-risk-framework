@@ -21,8 +21,8 @@ inputs, or optimization.
 
 ## Why portfolio arithmetic uses simple returns
 
-For asset simple returns `r_i` and fixed beginning-of-period weights `w_i`, the
-portfolio return is:
+For asset simple returns `r_i` and the actual beginning-of-period weights `w_i`,
+the one-period portfolio return before a close-time transaction cost is:
 
 ```text
 r_p = sum(w_i * r_i)
@@ -36,8 +36,14 @@ g_p = log(1 + sum(w_i * (exp(g_i) - 1)))
 ```
 
 Therefore `sum(w_i * g_i)` is not treated as the portfolio log return. The
-package reconstructs simple asset returns before deriving an exact diagnostic
-portfolio log return.
+package derives the realized simple return from the explicit portfolio path,
+then uses `log(1 + r_p)` only for the optional diagnostic portfolio Log series.
+
+Keeping `w_i` constant through every row implies a frictionless rebalance at
+every close. That behavior exists only under the labeled legacy daily-
+rebalanced policy. Buy & Hold carries quantities, so beginning weights drift;
+periodic policies reset them only on audited effective dates. Risk horizon is
+an aggregation/scaling choice and does not change those dates.
 
 ## Time aggregation
 
@@ -57,6 +63,8 @@ paths, cross-method scenario comparison, and optimization reject a declared Log
 input convention. This fails loudly instead of silently mixing arithmetic and
 log-return formulas.
 
-The policy object is implemented in
-`src/var_cvar_crypto_risk/return_conventions.py`. Exact aggregation is
-implemented in `portfolio.py` and horizon compounding in `returns.py`.
+The return-policy object is implemented in
+`src/var_cvar_crypto_risk/return_conventions.py`. Stateful wealth and realized
+portfolio returns are implemented in `portfolio_path.py`; legacy stateless
+aggregation remains in `portfolio.py`, and horizon compounding is in
+`returns.py`.

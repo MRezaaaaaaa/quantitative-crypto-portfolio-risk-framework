@@ -55,6 +55,19 @@ changes across the public analytics pipeline.
 - seeded seven-day Normal Monte Carlo risk; and
 - a one-day rolling Gaussian VaR/Kupiec snapshot.
 
+Portfolio Path V1 has separate deterministic contract tests for fixed
+quantities, drift, UTC event dates, cost accounting, missing-price deferral and
+zero-cost equivalence to the legacy daily constant-weight series. These tests
+are not silently folded into the version-1.0 numerical golden file because the
+new methodology has explicit versioned provenance.
+
+Periodic-path tests generate theoretical UTC weekly/monthly/quarterly
+boundaries independently of the observed index. They cover absent and incomplete
+scheduled closes, forward deferral, coalesced pending boundaries, one-cost
+execution, and unchanged clean-calendar behavior. Risk Summary tests also pin
+launch-peak drawdown, current-UTC-day exclusion, the long export schema, and
+the common application/publication summary contract.
+
 Deterministic analytical outputs use `rtol=1e-10` and `atol=1e-12`. Seeded
 Monte Carlo outputs use `rtol=1e-7` and `atol=1e-9` to allow immaterial
 cross-platform linear-algebra variation without accepting economically
@@ -78,6 +91,12 @@ The repository-local `methodology-demo-v1` experiment freezes a synthetic input
 hash, cutoff, portfolio, return convention, estimator settings, backtest,
 optimizer constraints, and article-to-app mapping. Generate it only from a
 clean reviewed commit:
+
+Its Risk Summary is built from an explicit Portfolio Path V1 config and exported
+with raw values and display values in the same long-form contract as Streamlit.
+Schema-v1 configs without path fields receive the documented Buy & Hold/zero-cost
+compatibility default, which is written to the manifest. Later schemas must
+declare the policy explicitly.
 
 ```bash
 uv run --locked --no-sync python -m scripts.reproduce_publication \
@@ -104,6 +123,9 @@ data source and extraction timestamp
 input file hash
 configuration hashes
 asset universe and weights
+portfolio evolution policy and methodology version
+rebalance frequency and UTC event convention
+commission, slippage, missing-price policy and risk-base NAV/date/type
 return convention
 return handling mode and diagnostic convention
 horizon and confidence level
@@ -135,15 +157,17 @@ actual data cutoff and should not be presented as exactly reproducible.
 ## Monitoring experiment reproducibility
 
 An activated monitoring experiment preserves an authoritative UUID, the date
-boundaries, frozen optimizer recipe and target allocation, source/recipe hashes,
-package and code versions, provider mapping, risk conventions, solver state,
-independent residual validation, and daily run/event provenance. This supports
+boundaries, frozen manual weights and risk recipe, source/recipe hashes,
+package and code versions, provider mapping, risk conventions, manual validation
+and daily run/event provenance. Existing optimized records retain their legacy
+recipes and solver validation. This supports
 an audit of what the framework calculated from the recorded information set.
 
 Historical OOS replay is the most repeatable monitoring mode when its full
-price input is pinned: it rebuilds through the cutoff and reveals evaluation
-observations sequentially. Determinism still requires the same input bytes,
-recipe, code/dependencies, solver environment, and tolerance policy.
+price input is pinned: it freezes manual weights and explicit launch prices,
+then reveals evaluation observations sequentially. Determinism requires the same
+input bytes, weights, recipe and code/dependencies. A historical decision date
+does not prove that a manual allocation was selected without hindsight.
 
 Live Forward and Hybrid append are not bit-for-bit reproducible from a later
 vendor request alone. Providers can revise history, change symbol coverage, or
