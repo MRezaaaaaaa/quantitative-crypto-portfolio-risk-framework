@@ -36,13 +36,37 @@ def test_correlation_matrix_bad_method_raises(sample_returns: pd.DataFrame) -> N
         calculate_correlation_matrix(sample_returns, method="kendall")
 
 
-def test_rolling_average_correlation_returns_series(sample_returns: pd.DataFrame) -> None:
+def test_rolling_average_correlation_returns_series(
+    sample_returns: pd.DataFrame,
+) -> None:
     window = 20
     out = calculate_rolling_average_correlation(sample_returns, window=window)
     assert isinstance(out, pd.Series)
     assert len(out) == len(sample_returns.dropna()) - window + 1
     # average correlation is bounded in [-1, 1]
     assert (out.abs() <= 1.0 + 1e-9).all()
+
+
+def test_rolling_average_correlation_respects_spearman_selection(
+    sample_returns: pd.DataFrame,
+) -> None:
+    pearson = calculate_rolling_average_correlation(
+        sample_returns, window=20, method="pearson"
+    )
+    spearman = calculate_rolling_average_correlation(
+        sample_returns, window=20, method="spearman"
+    )
+    assert pearson.index.equals(spearman.index)
+    assert not np.allclose(pearson.to_numpy(), spearman.to_numpy())
+
+
+def test_rolling_average_correlation_rejects_unknown_method(
+    sample_returns: pd.DataFrame,
+) -> None:
+    with pytest.raises(ValueError, match="method"):
+        calculate_rolling_average_correlation(
+            sample_returns, window=20, method="kendall"
+        )
 
 
 def test_rolling_average_correlation_needs_two_assets() -> None:

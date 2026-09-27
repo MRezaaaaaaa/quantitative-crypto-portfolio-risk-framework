@@ -30,7 +30,7 @@ from .domain import (
 )
 from .prices import NormalizedPriceData, normalize_monitoring_prices
 from .providers import PriceProviderRegistry
-from .recipes import OptimizationRecipe, optimization_recipe_from_dict
+from .recipes import MonitoringRecipe, monitoring_recipe_from_dict
 from .repository import PersistenceCounts
 from .risk_forecasts import build_origin_safe_forecast, evaluate_matured_forecast
 from .services import UnitOfWorkFactory
@@ -82,18 +82,20 @@ def _outcome_count(outcome: str) -> PersistenceCounts:
     raise RuntimeError(f"unsupported persistence outcome {outcome!r}")
 
 
-def _load_recipe(experiment: Experiment) -> OptimizationRecipe:
-    raw = experiment.source_metadata.get("optimization_recipe")
+def _load_recipe(experiment: Experiment) -> MonitoringRecipe:
+    raw = experiment.source_metadata.get(
+        "monitoring_recipe", experiment.source_metadata.get("optimization_recipe")
+    )
     if not isinstance(raw, Mapping):
-        raise DomainValidationError(
-            "experiment lacks the persisted Batch 5 optimization recipe"
-        )
-    recipe = optimization_recipe_from_dict(raw)
+        raise DomainValidationError("experiment lacks its persisted monitoring recipe")
+    recipe = monitoring_recipe_from_dict(raw)
     recorded = experiment.source_metadata.get("recipe_fingerprint")
     if recipe.fingerprint != recorded:
-        raise DomainValidationError("persisted optimization recipe hash mismatch")
+        raise DomainValidationError("persisted monitoring recipe hash mismatch")
     if not recipe.source.refreshable:
-        raise DomainValidationError("Live Forward and Hybrid require a refreshable source")
+        raise DomainValidationError(
+            "Live Forward and Hybrid require a refreshable source"
+        )
     return recipe
 
 
@@ -216,14 +218,16 @@ def _slice_normalized(
     )
 
 
-def _candidate_start(
-    experiment: Experiment, states: list[DailyPortfolioState]
-) -> date:
+def _candidate_start(experiment: Experiment, states: list[DailyPortfolioState]) -> date:
     assert experiment.launch_date is not None
     if not states:
         return experiment.launch_date
     latest = states[-1]
-    return latest.state_date if not latest.finalized else latest.state_date + timedelta(days=1)
+    return (
+        latest.state_date
+        if not latest.finalized
+        else latest.state_date + timedelta(days=1)
+    )
 
 
 def _complete_provider_cutoff(
@@ -244,7 +248,7 @@ def _complete_provider_cutoff(
 
 
 def _scheduled_origin(
-    *, experiment: Experiment, origin: date, recipe: OptimizationRecipe
+    *, experiment: Experiment, origin: date, recipe: MonitoringRecipe
 ) -> bool:
     assert experiment.launch_date is not None
     return recipe.risk.evaluation_mode == "overlapping" or (
@@ -254,9 +258,7 @@ def _scheduled_origin(
 
 def _sanitized_provider_metadata(metadata: Mapping) -> dict:
     """Persist only reviewed non-secret provider capability flags."""
-    return {
-        "research_grade_vendor": bool(metadata.get("research_grade_vendor", False))
-    }
+    return {"research_grade_vendor": bool(metadata.get("research_grade_vendor", False))}
 
 
 class LiveMonitoringService:
@@ -280,7 +282,9 @@ class LiveMonitoringService:
         if experiment is None:
             raise RecordNotFoundError(f"experiment {experiment_id} does not exist")
         if snapshot is None or snapshot.activated_at is None:
-            raise DomainValidationError("active monitoring requires an activated snapshot")
+            raise DomainValidationError(
+                "active monitoring requires an activated snapshot"
+            )
         return experiment, snapshot, states
 
     def _start_run(
@@ -304,9 +308,9 @@ class LiveMonitoringService:
                 requested_cutoff=requested_cutoff,
                 started_at=started_at,
                 run_metadata={
-                    "requested_provider": experiment.source_metadata.get("source", {}).get(
-                        "provider"
-                    ),
+                    "requested_provider": experiment.source_metadata.get(
+                        "source", {}
+                    ).get("provider"),
                     "retry_of": retry_of,
                     "partial_current_utc_day_excluded": True,
                     "effective_as_of_utc": effective_as_of.isoformat(),
@@ -379,13 +383,17 @@ class LiveMonitoringService:
 
         experiment, snapshot, existing_states = self._load(experiment_id)
         if experiment.mode not in {ExperimentMode.LIVE_FORWARD, ExperimentMode.HYBRID}:
-            raise DomainValidationError("live update requires Live Forward or Hybrid mode")
+            raise DomainValidationError(
+                "live update requires Live Forward or Hybrid mode"
+            )
         if experiment.status is not ExperimentStatus.ACTIVE:
             raise DomainValidationError("live update requires an active experiment")
         assert experiment.launch_date is not None
         recipe = _load_recipe(experiment)
         if snapshot.assumption_recipe_hash != recipe.fingerprint:
-            raise DomainValidationError("snapshot and persisted monitoring recipe differ")
+            raise DomainValidationError(
+                "snapshot and persisted monitoring recipe differ"
+            )
         policy_cutoff = min(requested, last_complete_utc_day)
         if experiment.live_tracking_end is not None:
             policy_cutoff = min(policy_cutoff, experiment.live_tracking_end)
@@ -399,7 +407,10 @@ class LiveMonitoringService:
         try:
             market_assets = _market_assets(snapshot)
             symbols = market_assets
-            if experiment.benchmark_symbol and experiment.benchmark_symbol not in symbols:
+            if (
+                experiment.benchmark_symbol
+                and experiment.benchmark_symbol not in symbols
+            ):
                 symbols = (*symbols, experiment.benchmark_symbol)
             start_date = _candidate_start(experiment, existing_states)
             if policy_cutoff < start_date:
@@ -407,7 +418,9 @@ class LiveMonitoringService:
                     run=run,
                     experiment=experiment,
                     requested=requested,
-                    actual_cutoff=(existing_states[-1].state_date if existing_states else None),
+                    actual_cutoff=(
+                        existing_states[-1].state_date if existing_states else None
+                    ),
                     reason="requested cutoff has no new complete UTC dates",
                 )
             lookback_start = start_date - timedelta(days=recipe.risk.estimation_window)
@@ -419,7 +432,9 @@ class LiveMonitoringService:
                 requested_at=invoked_at,
             )
             if batch.quote_currency != recipe.source.quote_currency:
-                raise DomainValidationError("provider quote currency differs from recipe")
+                raise DomainValidationError(
+                    "provider quote currency differs from recipe"
+                )
             normalized = normalize_monitoring_prices(
                 batch.prices,
                 source=batch.actual_source,
@@ -437,7 +452,9 @@ class LiveMonitoringService:
                     run=run,
                     experiment=experiment,
                     requested=requested,
-                    actual_cutoff=(existing_states[-1].state_date if existing_states else None),
+                    actual_cutoff=(
+                        existing_states[-1].state_date if existing_states else None
+                    ),
                     reason="provider returned no new complete frozen-universe date",
                     actual_source=batch.actual_source,
                     fallback_used=fallback_used,
@@ -450,7 +467,9 @@ class LiveMonitoringService:
                 experiment=experiment,
                 cutoff=actual_cutoff,
             )
-            candidate_dates = list(pd.date_range(start_date, actual_cutoff, freq="D").date)
+            candidate_dates = list(
+                pd.date_range(start_date, actual_cutoff, freq="D").date
+            )
             states_to_write: list[DailyPortfolioState] = []
             forecasts_to_write = []
             for current_date in candidate_dates:
@@ -463,7 +482,9 @@ class LiveMonitoringService:
                     calculation_version=calculation_version,
                 )[-1]
                 if state.state_date != current_date:
-                    raise DomainValidationError("live valuation did not end at update date")
+                    raise DomainValidationError(
+                        "live valuation did not end at update date"
+                    )
                 states_to_write.append(state)
                 if state.finalized and _scheduled_origin(
                     experiment=experiment, origin=current_date, recipe=recipe
@@ -570,7 +591,7 @@ class LiveMonitoringService:
         *,
         run: MonitoringRun,
         experiment: Experiment,
-        recipe: OptimizationRecipe,
+        recipe: MonitoringRecipe,
         requested: date,
         actual_cutoff: date,
         actual_source: str,
@@ -622,9 +643,7 @@ class LiveMonitoringService:
                     target_state=target_state,
                 )
                 outcome = uow.forecasts.write(evaluated)
-                forecast_counts = _add_counts(
-                    forecast_counts, _outcome_count(outcome)
-                )
+                forecast_counts = _add_counts(forecast_counts, _outcome_count(outcome))
                 if outcome == "evaluated":
                     evaluated_count += 1
 
@@ -641,12 +660,12 @@ class LiveMonitoringService:
                         experiment.experiment_id, ExperimentStatus.COMPLETED
                     ).status
             inserted = (
-                price_counts.inserted
-                + state_counts.inserted
-                + forecast_counts.inserted
+                price_counts.inserted + state_counts.inserted + forecast_counts.inserted
             )
             updated = state_counts.updated + forecast_counts.updated
-            skipped = price_counts.skipped + state_counts.skipped + forecast_counts.skipped
+            skipped = (
+                price_counts.skipped + state_counts.skipped + forecast_counts.skipped
+            )
             metadata = {
                 **run.run_metadata,
                 "actual_source": actual_source,

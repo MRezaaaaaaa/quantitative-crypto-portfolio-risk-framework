@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import pytest
 import yaml
 
@@ -12,10 +14,7 @@ from scripts import publication_workflow as workflow
 
 
 CONFIG_PATH = (
-    workflow.PROJECT_ROOT
-    / "publication"
-    / "configs"
-    / "methodology_demo_v1.yaml"
+    workflow.PROJECT_ROOT / "publication" / "configs" / "methodology_demo_v1.yaml"
 )
 
 
@@ -47,15 +46,15 @@ def test_manifest_verification_and_publication_boundary(
     first, _ = generated_bundles
     result = workflow.verify_publication_manifest(first / "manifest.json")
     manifest = json.loads((first / "manifest.json").read_text(encoding="utf-8"))
-    all_text = "\n".join(
-        path.read_text(encoding="utf-8") for path in first.iterdir()
-    )
+    all_text = "\n".join(path.read_text(encoding="utf-8") for path in first.iterdir())
 
     assert result["verified"] is True
     assert result["artifact_count"] == 10
     assert manifest["experiment"]["claims_boundary"] == "synthetic_methodology_only"
     assert manifest["generation"]["offline"] is True
-    assert manifest["data"]["used_end_date"] <= manifest["data"]["configured_cutoff_date"]
+    assert (
+        manifest["data"]["used_end_date"] <= manifest["data"]["configured_cutoff_date"]
+    )
     assert manifest["data"]["source_end_date"] > manifest["data"]["used_end_date"]
     assert manifest["bias_controls"]["optimization"].startswith(
         "Optimization is in-sample"
@@ -64,6 +63,86 @@ def test_manifest_verification_and_publication_boundary(
     assert ".codex" not in all_text
     assert "COINGECKO_API_KEY" not in all_text
     assert "private_holdings" not in all_text.lower()
+
+
+def test_publication_uses_authoritative_historical_risk_summary_contract(
+    generated_bundles: tuple[Path, Path],
+) -> None:
+    first, _ = generated_bundles
+    risk_summary = pd.read_csv(first / "risk_summary.csv")
+    manifest = json.loads((first / "manifest.json").read_text(encoding="utf-8"))
+    experiment = json.loads(
+        (first / "experiment_summary.json").read_text(encoding="utf-8")
+    )
+
+    assert list(risk_summary.columns) == [
+        "Record Type",
+        "Section",
+        "Name",
+        "Value",
+        "Display Value",
+        "Unit",
+        "Sample Size",
+    ]
+    metric_names = set(
+        risk_summary.loc[risk_summary["Record Type"] == "Metric", "Name"]
+    )
+    assert "Annualized Return" not in metric_names
+    assert "Annualized Volatility" not in metric_names
+    assert "Max Drawdown" not in metric_names
+    assert "Maximum Drawdown" in metric_names
+    assert not any("Sharpe" in name for name in metric_names)
+
+    path_contract = manifest["assumptions"]["portfolio_path"]
+    assert path_contract["policy"] == "buy_and_hold"
+    assert path_contract["commission_bps"] == 0.0
+    assert path_contract["slippage_bps"] == 0.0
+    assert path_contract["methodology_version"] == "portfolio-path-v1"
+    assert path_contract["cutoff_date"] == manifest["data"]["used_end_date"]
+    assert path_contract["policy_defaulted_from_schema_v1"] is False
+    assert experiment["portfolio"]["initial_capital"] == 100_000.0
+    assert experiment["portfolio"]["ending_net_nav"] > 0.0
+
+
+def test_publication_summary_includes_first_period_loss_from_explicit_path() -> None:
+    config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    index = pd.date_range("2024-01-01", periods=10, freq="D")
+    wealth = np.array(
+        [100.0, 80.0, 90.0, 95.0, 100.0, 105.0, 103.0, 106.0, 108.0, 110.0]
+    )
+    prices = pd.DataFrame({"BTC": wealth, "ETH": wealth, "SOL": wealth}, index=index)
+    metadata = {
+        "used_end_date": "2024-01-10",
+        "path": "tests/fixtures/synthetic_daily_prices.csv",
+    }
+    path, summary, defaulted = workflow._build_publication_historical_summary(
+        config,
+        prices,
+        pd.Series(config["portfolio"]["weights"], dtype=float),
+        metadata,
+    )
+    primary = summary.primary.set_index("Metric")["Value"]
+
+    assert defaulted is False
+    assert primary["Maximum Drawdown"] == pytest.approx(-0.20)
+    assert primary["Ending Net NAV"] == pytest.approx(path.latest_net_nav)
+    assert primary["Net Cumulative Return"] == pytest.approx(
+        path.latest_net_nav / config["portfolio"]["initial_capital"] - 1.0
+    )
+
+
+def test_schema_v1_missing_policy_defaults_to_buy_and_hold_and_is_recorded() -> None:
+    config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    config["portfolio"].pop("evolution_policy")
+    config["portfolio"].pop("commission_bps")
+    config["portfolio"].pop("slippage_bps")
+
+    path_config, defaulted = workflow._publication_portfolio_path_config(config)
+
+    assert path_config.policy.value == "buy_and_hold"
+    assert path_config.commission_bps == 0.0
+    assert path_config.slippage_bps == 0.0
+    assert defaulted is True
 
 
 def test_manifest_detects_tampered_artifact(

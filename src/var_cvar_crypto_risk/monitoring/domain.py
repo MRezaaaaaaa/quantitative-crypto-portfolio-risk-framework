@@ -138,9 +138,7 @@ def ensure_utc(value: datetime, field_name: str) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def validate_transition(
-    current: ExperimentStatus, target: ExperimentStatus
-) -> None:
+def validate_transition(current: ExperimentStatus, target: ExperimentStatus) -> None:
     """Raise when a lifecycle transition is not in the reviewed state machine."""
     if target not in ALLOWED_TRANSITIONS[current]:
         raise InvalidTransitionError(
@@ -176,9 +174,7 @@ def validate_date_boundaries(
         and optimization_as_of is not None
         and training_end > optimization_as_of
     ):
-        raise DomainValidationError(
-            "training_end must not exceed optimization_as_of"
-        )
+        raise DomainValidationError("training_end must not exceed optimization_as_of")
     if (
         optimization_as_of is not None
         and launch_date is not None
@@ -348,7 +344,7 @@ class SnapshotAllocation:
 
 @dataclass(frozen=True)
 class OptimizationSnapshot:
-    """Immutable repository-facing optimization snapshot."""
+    """Immutable portfolio snapshot (legacy table name retained for compatibility)."""
 
     snapshot_id: UUID
     experiment_id: UUID
@@ -399,7 +395,62 @@ class OptimizationSnapshot:
             else None
         )
         if activated_at is not None:
-            if self.solver_status not in {"optimal", "optimal_inaccurate"}:
+            manual = self.objective == "manual"
+            if manual:
+                if not (
+                    self.solver == "none"
+                    and self.solver_status == "manual_validated"
+                    and self.assumptions.get("construction_method") == "manual"
+                    and self.residual_validation.get("validation_type")
+                    == "manual_allocation"
+                ):
+                    raise DomainValidationError(
+                        "manual snapshot requires honest manual provenance and validation"
+                    )
+                for item in self.allocations:
+                    if (
+                        item.target_weight <= 0
+                        or item.initial_value <= 0
+                        or item.quantity <= 0
+                    ):
+                        raise DomainValidationError(
+                            "manual allocations must be positive and long-only"
+                        )
+                    if not item.is_cash and item.launch_price is None:
+                        raise DomainValidationError(
+                            "manual market allocation requires a launch price"
+                        )
+                    value = (
+                        item.quantity
+                        if item.is_cash
+                        else item.quantity * item.launch_price
+                    )
+                    if not math.isclose(
+                        value, item.initial_value, rel_tol=1e-10, abs_tol=1e-8
+                    ):
+                        raise DomainValidationError(
+                            "manual quantities must match launch values"
+                        )
+                if self.assumptions.get("weights") != {
+                    item.asset: item.target_weight for item in self.allocations
+                }:
+                    raise DomainValidationError(
+                        "manual allocation weights must match their frozen recipe"
+                    )
+                total = math.fsum(item.initial_value for item in self.allocations)
+                if any(
+                    not math.isclose(
+                        item.initial_value,
+                        total * item.target_weight,
+                        rel_tol=1e-10,
+                        abs_tol=1e-8,
+                    )
+                    for item in self.allocations
+                ):
+                    raise DomainValidationError(
+                        "manual allocation values must be proportional to weights"
+                    )
+            elif self.solver_status not in {"optimal", "optimal_inaccurate"}:
                 raise DomainValidationError(
                     "activated snapshot requires a reviewed solved status"
                 )
@@ -586,7 +637,9 @@ class DailyPortfolioState:
                     "complete portfolio state is missing valuation fields"
                 )
             if not self.finalized:
-                raise DomainValidationError("complete portfolio state must be finalized")
+                raise DomainValidationError(
+                    "complete portfolio state must be finalized"
+                )
             if self.nav is not None and self.nav <= 0.0:
                 raise DomainValidationError("complete portfolio NAV must be positive")
             if self.drawdown is not None and self.drawdown > 1e-12:
@@ -611,8 +664,12 @@ class DailyPortfolioState:
                 "incomplete portfolio state must remain non-finalized"
             )
         object.__setattr__(self, "quality_metadata", dict(self.quality_metadata))
-        object.__setattr__(self, "created_at", ensure_utc(self.created_at, "created_at"))
-        object.__setattr__(self, "updated_at", ensure_utc(self.updated_at, "updated_at"))
+        object.__setattr__(
+            self, "created_at", ensure_utc(self.created_at, "created_at")
+        )
+        object.__setattr__(
+            self, "updated_at", ensure_utc(self.updated_at, "updated_at")
+        )
 
 
 @dataclass(frozen=True)
@@ -651,11 +708,15 @@ class DailyRiskForecast:
         if self.horizon_days < 1:
             raise DomainValidationError("forecast horizon_days must be positive")
         if self.estimation_window < 2:
-            raise DomainValidationError("forecast estimation_window must be at least two")
+            raise DomainValidationError(
+                "forecast estimation_window must be at least two"
+            )
         if self.input_max_date > self.origin_date:
             raise DomainValidationError("forecast inputs must not exceed origin_date")
         if not _SHA256_PATTERN.fullmatch(self.input_data_hash):
-            raise DomainValidationError("input_data_hash must be a lowercase SHA-256 hash")
+            raise DomainValidationError(
+                "input_data_hash must be a lowercase SHA-256 hash"
+            )
         if not (0.0 < self.confidence_level < 1.0):
             raise DomainValidationError("forecast confidence_level must be in (0, 1)")
         required_text = {
@@ -706,7 +767,9 @@ class DailyRiskForecast:
                 or self.var_breach is not None
                 or self.evaluated_at is not None
             ):
-                raise DomainValidationError("pending forecast must not contain an outcome")
+                raise DomainValidationError(
+                    "pending forecast must not contain an outcome"
+                )
         elif self.evaluation_status is ForecastEvaluationStatus.EVALUATED:
             if (
                 self.realized_horizon_loss is None
@@ -725,7 +788,9 @@ class DailyRiskForecast:
             raise DomainValidationError(
                 "only an evaluated forecast may contain evaluated_at"
             )
-        object.__setattr__(self, "evaluation_mode", self.evaluation_mode.strip().lower())
+        object.__setattr__(
+            self, "evaluation_mode", self.evaluation_mode.strip().lower()
+        )
         object.__setattr__(self, "var_method", self.var_method.strip().lower())
         object.__setattr__(self, "cvar_method", self.cvar_method.strip().lower())
         object.__setattr__(
@@ -735,7 +800,9 @@ class DailyRiskForecast:
             self, "portfolio_definition", self.portfolio_definition.strip().lower()
         )
         object.__setattr__(self, "forecast_metadata", dict(self.forecast_metadata))
-        object.__setattr__(self, "created_at", ensure_utc(self.created_at, "created_at"))
+        object.__setattr__(
+            self, "created_at", ensure_utc(self.created_at, "created_at")
+        )
         if self.evaluated_at is not None:
             object.__setattr__(
                 self, "evaluated_at", ensure_utc(self.evaluated_at, "evaluated_at")
@@ -782,7 +849,9 @@ class ExperimentEvent:
             raise DomainValidationError("event_type is required")
         object.__setattr__(self, "event_type", event_type)
         object.__setattr__(self, "event_metadata", dict(self.event_metadata))
-        object.__setattr__(self, "created_at", ensure_utc(self.created_at, "created_at"))
+        object.__setattr__(
+            self, "created_at", ensure_utc(self.created_at, "created_at")
+        )
 
 
 @dataclass(frozen=True)
@@ -819,12 +888,14 @@ class MonitoringRun:
                 raise DomainValidationError(f"{name} must be non-negative")
         started = ensure_utc(self.started_at, "started_at")
         ended = (
-            ensure_utc(self.ended_at, "ended_at")
-            if self.ended_at is not None
-            else None
+            ensure_utc(self.ended_at, "ended_at") if self.ended_at is not None else None
         )
         if self.status is MonitoringRunStatus.RUNNING:
-            if ended is not None or self.error_code is not None or self.error_summary is not None:
+            if (
+                ended is not None
+                or self.error_code is not None
+                or self.error_summary is not None
+            ):
                 raise DomainValidationError(
                     "running monitoring run cannot contain an outcome"
                 )

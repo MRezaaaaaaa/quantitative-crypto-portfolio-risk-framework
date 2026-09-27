@@ -19,6 +19,9 @@ data:
 
 portfolio:
   initial_capital: 100000.0
+  evolution_policy: buy_and_hold
+  commission_bps: 0.0
+  slippage_bps: 0.0
   weights:
     BTC: 0.50
     ETH: 0.30

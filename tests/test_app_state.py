@@ -52,8 +52,7 @@ def test_return_handling_defaults_to_automatic_and_exposes_advanced_log() -> Non
     )
     assert return_handling.value == "automatic"
     assert not any(
-        widget.label == "Diagnostic return convention"
-        for widget in at.selectbox
+        widget.label == "Diagnostic return convention" for widget in at.selectbox
     )
 
     return_handling.set_value("advanced").run()
@@ -66,6 +65,47 @@ def test_return_handling_defaults_to_automatic_and_exposes_advanced_log() -> Non
     diagnostic.set_value("log").run()
     assert not at.exception
     assert diagnostic.value == "log"
+
+
+def test_portfolio_evolution_policy_is_explicit_and_independent_of_horizon() -> None:
+    at = AppTest.from_file("app.py", default_timeout=60).run()
+    assert not at.exception
+
+    policy = next(
+        widget
+        for widget in at.selectbox
+        if widget.label == "Portfolio evolution policy"
+    )
+    assert policy.value == "Buy & Hold — fixed quantities"
+
+    policy.set_value("Periodic rebalance to target weights").run()
+    assert not at.exception
+    frequency = next(
+        widget for widget in at.selectbox if widget.label == "Rebalance frequency"
+    )
+    frequency.set_value("weekly").run()
+    horizon = next(
+        widget for widget in at.number_input if widget.label == "Time horizon (days)"
+    )
+    horizon.set_value(30).run()
+
+    assert not at.exception
+    assert (
+        next(
+            widget
+            for widget in at.selectbox
+            if widget.label == "Portfolio evolution policy"
+        ).value
+        == "Periodic rebalance to target weights"
+    )
+    assert (
+        next(
+            widget for widget in at.selectbox if widget.label == "Rebalance frequency"
+        ).value
+        == "weekly"
+    )
+    labels = {widget.label for widget in at.number_input}
+    assert {"Commission (bps)", "Slippage (bps)"}.issubset(labels)
 
 
 def test_legacy_return_state_is_invalidated() -> None:
@@ -103,9 +143,7 @@ def test_monitoring_workspace_handles_a_migrated_empty_registry(
     tmp_path: Path, monkeypatch
 ) -> None:
     database_path = tmp_path / "migrated.db"
-    engine = create_monitoring_engine(
-        f"sqlite+pysqlite:///{database_path.as_posix()}"
-    )
+    engine = create_monitoring_engine(f"sqlite+pysqlite:///{database_path.as_posix()}")
     Base.metadata.create_all(engine)
     with engine.begin() as connection:
         connection.execute(
@@ -133,10 +171,7 @@ def test_monitoring_workspace_handles_a_migrated_empty_registry(
     view = next(widget for widget in at.radio if widget.label == "Monitoring view")
     view.set_value("Create Forward Test").run()
     assert not at.exception
-    assert any(
-        "Post-launch policy" in item.value
-        for item in at.markdown
-    )
+    assert any("Post-launch policy" in item.value for item in at.markdown)
 
     view = next(widget for widget in at.radio if widget.label == "Monitoring view")
     view.set_value("Comparison").run()

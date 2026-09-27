@@ -28,13 +28,14 @@ from .domain import (
     validate_date_boundaries,
 )
 from .optimization_adapter import build_point_in_time_snapshot
+from .manual_portfolio import build_manual_snapshot, manual_snapshot_source_hash
 from .prices import (
     NormalizedPriceData,
     fingerprint_price_slice,
     missing_symbols_on_date,
     normalize_monitoring_prices,
 )
-from .recipes import OptimizationRecipe
+from .recipes import ManualMonitoringRecipe, MonitoringRecipe, OptimizationRecipe
 from .repository import PersistenceCounts
 from .risk_forecasts import (
     build_origin_safe_forecast,
@@ -103,7 +104,7 @@ def _verify_existing_snapshot(
     experiment: Experiment,
     normalized: NormalizedPriceData,
     universe: tuple[str, ...],
-    recipe: OptimizationRecipe,
+    recipe: MonitoringRecipe,
 ) -> None:
     if snapshot.activated_at is None:
         raise ImmutableRecordError("historical replay snapshot is not activated")
@@ -116,10 +117,12 @@ def _verify_existing_snapshot(
         & (normalized.prices.index <= pd.Timestamp(experiment.training_end)),
         list(universe),
     ]
-    source_hash = fingerprint_price_slice(
-        training,
-        source=normalized.source,
-        quote_currency=normalized.quote_currency,
+    source_hash = (
+        manual_snapshot_source_hash(normalized, experiment, universe)
+        if isinstance(recipe, ManualMonitoringRecipe)
+        else fingerprint_price_slice(
+            training, source=normalized.source, quote_currency=normalized.quote_currency
+        )
     )
     if source_hash != snapshot.source_data_hash:
         raise ImmutableRecordError(
@@ -172,7 +175,7 @@ class HistoricalReplayService:
         experiment: Experiment,
         normalized: NormalizedPriceData,
         universe: tuple[str, ...],
-        recipe: OptimizationRecipe,
+        recipe: MonitoringRecipe,
     ) -> date:
         if experiment.mode not in {
             ExperimentMode.HISTORICAL_OOS,
@@ -194,12 +197,18 @@ class HistoricalReplayService:
         assert experiment.historical_evaluation_end is not None
         assert experiment.launch_date is not None
         if normalized.source != recipe.source.provider:
-            raise DomainValidationError("replay actual source differs from frozen recipe")
+            raise DomainValidationError(
+                "replay actual source differs from frozen recipe"
+            )
         if normalized.quote_currency != recipe.source.quote_currency:
             raise DomainValidationError(
                 "replay quote currency differs from frozen recipe"
             )
-        if recipe.scenario.source != "historical" and recipe.scenario.random_seed is None:
+        if (
+            isinstance(recipe, OptimizationRecipe)
+            and recipe.scenario.source != "historical"
+            and recipe.scenario.random_seed is None
+        ):
             raise DomainValidationError(
                 "historical replay requires a deterministic Monte Carlo random_seed"
             )
@@ -237,7 +246,7 @@ class HistoricalReplayService:
         experiment_id: UUID,
         normalized: NormalizedPriceData,
         universe: tuple[str, ...] | list[str],
-        recipe: OptimizationRecipe,
+        recipe: MonitoringRecipe,
         package_version: str,
         code_version: str,
         calculation_version: str,
@@ -267,7 +276,12 @@ class HistoricalReplayService:
         )
         with self._uow_factory() as uow:
             snapshot = uow.snapshots.get_for_experiment(experiment_id)
-        rebuilt_snapshot = build_point_in_time_snapshot(
+        snapshot_builder = (
+            build_manual_snapshot
+            if isinstance(recipe, ManualMonitoringRecipe)
+            else build_point_in_time_snapshot
+        )
+        rebuilt_snapshot = snapshot_builder(
             experiment=experiment,
             normalized=launch_visible,
             universe=assets,
@@ -288,7 +302,7 @@ class HistoricalReplayService:
                 rebuilt_snapshot
             ):
                 raise ImmutableRecordError(
-                    "persisted snapshot does not match cutoff-rebuilt optimization"
+                    "persisted snapshot does not match cutoff-rebuilt portfolio construction"
                 )
         else:
             snapshot = rebuilt_snapshot
@@ -324,7 +338,9 @@ class HistoricalReplayService:
                 if uow.snapshots.get_for_experiment(experiment_id) is None:
                     uow.snapshots.add(snapshot)
                 training_visible = _normalized_slice(
-                    bounded, start=experiment.training_start, end=experiment.optimization_as_of
+                    bounded,
+                    start=experiment.training_start,
+                    end=experiment.optimization_as_of,
                 )
                 price_counts = _add_counts(
                     price_counts, uow.prices.add_many(training_visible.observations())
@@ -336,7 +352,9 @@ class HistoricalReplayService:
                 & (bounded.prices.index <= pd.Timestamp(boundary))
             ]
             if replay_rows.empty:
-                raise DomainValidationError("historical replay interval contains no rows")
+                raise DomainValidationError(
+                    "historical replay interval contains no rows"
+                )
 
             for timestamp in replay_rows.index:
                 current_date = timestamp.date()
@@ -369,11 +387,7 @@ class HistoricalReplayService:
                         % recipe.risk.horizon_days
                         == 0
                     )
-                    if (
-                        state.finalized
-                        and scheduled
-                        and target_date <= boundary
-                    ):
+                    if state.finalized and scheduled and target_date <= boundary:
                         new_forecast = build_origin_safe_forecast(
                             normalized=revealed,
                             state=state,
@@ -388,7 +402,9 @@ class HistoricalReplayService:
                     )
                     if state is not None:
                         outcome = uow.valuations.write(state)
-                        state_counts = _add_counts(state_counts, _outcome_count(outcome))
+                        state_counts = _add_counts(
+                            state_counts, _outcome_count(outcome)
+                        )
                     pending = uow.forecasts.list(
                         experiment_id,
                         evaluation_status=ForecastEvaluationStatus.PENDING,
@@ -456,7 +472,10 @@ class HistoricalReplayService:
         except Exception:
             with self._uow_factory() as uow:
                 current = uow.experiments.get(experiment_id)
-                if current is not None and current.status is ExperimentStatus.BACKFILLING:
+                if (
+                    current is not None
+                    and current.status is ExperimentStatus.BACKFILLING
+                ):
                     uow.experiments.transition(experiment_id, ExperimentStatus.FAILED)
                     uow.events.add(
                         ExperimentEvent(

@@ -5,13 +5,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")  # headless backend for chart smoke tests
-
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-import pytest  # noqa: E402
+import numpy as np
+import pandas as pd
+import pytest
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

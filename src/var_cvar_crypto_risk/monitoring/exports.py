@@ -61,7 +61,9 @@ def export_experiment_bundle(
         states = uow.valuations.list(experiment_id)
         events = uow.events.list(experiment_id)
         source_info = experiment.source_metadata.get("source", {})
-        provider = source_info.get("provider") if isinstance(source_info, dict) else None
+        provider = (
+            source_info.get("provider") if isinstance(source_info, dict) else None
+        )
         quote = (
             source_info.get("quote_currency")
             if isinstance(source_info, dict)
@@ -166,7 +168,11 @@ def export_experiment_bundle(
             }
             for item in snapshot.allocations
         ]
-    snapshot_path = destination / "optimization_snapshot.json"
+    snapshot_path = destination / (
+        "portfolio_snapshot.json"
+        if snapshot is not None and snapshot.objective == "manual"
+        else "optimization_snapshot.json"
+    )
     _write_json(snapshot_path, snapshot_payload)
     allocations_path = destination / "snapshot_allocations.csv"
     pd.DataFrame(allocation_rows).to_csv(allocations_path, index=False)

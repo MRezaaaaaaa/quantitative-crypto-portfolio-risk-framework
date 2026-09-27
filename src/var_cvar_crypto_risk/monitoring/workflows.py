@@ -1,9 +1,8 @@
 """Explicit experiment-creation workflows used by the monitoring UI.
 
-The workflow composes reviewed domain services.  Historical and Hybrid modes
-always rebuild through the Historical OOS service.  Live Forward freezes one
-point-in-time snapshot and launch state; it does not reuse Streamlit session
-optimizer output.
+New experiments freeze explicitly entered manual weights. Historical and
+Hybrid modes replay the same fixed quantities; Live Forward stores a launch
+state. This workflow never invokes or reuses an optimizer.
 """
 
 from __future__ import annotations
@@ -20,12 +19,13 @@ from .domain import (
     ExperimentEvent,
     ExperimentMode,
     ExperimentStatus,
+    DomainValidationError,
     validate_date_boundaries,
 )
 from .historical_replay import HistoricalReplayResult, HistoricalReplayService
-from .optimization_adapter import build_point_in_time_snapshot
+from .manual_portfolio import build_manual_snapshot
 from .prices import NormalizedPriceData, normalize_monitoring_prices
-from .recipes import OptimizationRecipe
+from .recipes import ManualMonitoringRecipe
 from .risk_forecasts import build_origin_safe_forecast
 from .services import ExperimentRegistry, UnitOfWorkFactory
 from .valuation import value_fixed_holdings
@@ -68,7 +68,7 @@ class ExperimentCreationWorkflow:
         mode: ExperimentMode,
         base_currency: str,
         initial_capital: float,
-        recipe: OptimizationRecipe,
+        recipe: ManualMonitoringRecipe,
         normalized: NormalizedPriceData,
         universe: list[str] | tuple[str, ...],
         training_start: date,
@@ -84,7 +84,17 @@ class ExperimentCreationWorkflow:
         benchmark_symbol: str | None = None,
         asset_types: Mapping[str, str] | None = None,
     ) -> ExperimentInitializationResult:
-        """Create from a frozen recipe without any session-state result reuse."""
+        """Create from a manual allocation only, with no optimization."""
+        if not isinstance(recipe, ManualMonitoringRecipe):
+            raise DomainValidationError(
+                "new monitoring experiments require explicit manual portfolio weights"
+            )
+        if len(universe) != len(set(universe)) or set(universe) != set(
+            recipe.market_assets
+        ):
+            raise DomainValidationError(
+                "manual portfolio universe must match entered weights"
+            )
         validate_date_boundaries(
             mode=mode,
             training_start=training_start,
@@ -127,10 +137,8 @@ class ExperimentCreationWorkflow:
                 historical_replay=replay,
             )
 
-        bounded = _bounded_prices(
-            normalized, start=training_start, end=launch_date
-        )
-        snapshot = build_point_in_time_snapshot(
+        bounded = _bounded_prices(normalized, start=training_start, end=launch_date)
+        snapshot = build_manual_snapshot(
             experiment=experiment,
             normalized=bounded,
             universe=assets,
@@ -174,6 +182,7 @@ class ExperimentCreationWorkflow:
                         "snapshot_id": str(snapshot.snapshot_id),
                         "launch_date": launch_date.isoformat(),
                         "session_optimizer_reused": False,
+                        "construction_method": "manual",
                     },
                 )
             )

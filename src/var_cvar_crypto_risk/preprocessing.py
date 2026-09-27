@@ -5,16 +5,41 @@ from __future__ import annotations
 import pandas as pd
 
 
-def clean_price_data(prices: pd.DataFrame) -> pd.DataFrame:
-    """Apply the full cleaning pipeline: sort, dedupe, handle missing values.
+def clean_price_data(
+    prices: pd.DataFrame, *, preserve_missing: bool = False
+) -> pd.DataFrame:
+    """Sort/deduplicate prices and optionally retain auditable missing values.
 
     Returns a clean copy. Does not modify ``prices`` in place.
+
+    ``preserve_missing=True`` is required by stateful portfolio paths: a missing
+    scheduled close must remain visible so rebalancing can be deferred rather
+    than silently valued from a forward-filled price.
     """
     df = prices.copy()
-    df.index = pd.to_datetime(df.index).normalize()
+    source_index = pd.DatetimeIndex(pd.to_datetime(df.index)).normalize()
+    source_duplicate_dates = tuple(
+        pd.Timestamp(value)
+        for value in source_index[source_index.duplicated(keep=False)].unique()
+    )
+    source_unsorted_dates = not source_index.is_monotonic_increasing
+    source_missing_price_rows = tuple(
+        pd.Timestamp(value)
+        for value in source_index[df.isna().any(axis=1).to_numpy()].unique()
+    )
+    df.index = source_index
     df = df.sort_index()
     df = df[~df.index.duplicated(keep="last")]
-    df = align_price_data(df)
+    if preserve_missing:
+        df = df.dropna(how="all")
+    else:
+        df = align_price_data(df)
+    # Preserve observable source defects after the normalization required by
+    # downstream accounting.  The audited path consumes the clean frame, while
+    # the retrospective summary can still disclose what arrived from the vendor.
+    df.attrs["source_duplicate_dates"] = source_duplicate_dates
+    df.attrs["source_unsorted_dates"] = source_unsorted_dates
+    df.attrs["source_missing_price_rows"] = source_missing_price_rows
     return df
 
 

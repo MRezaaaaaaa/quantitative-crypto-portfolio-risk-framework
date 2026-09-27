@@ -1,5 +1,10 @@
 # Phase 8 implementation tasks
 
+> These batches record the original implementation. New experiment construction
+> is superseded by the manual-only update recorded in
+> `openspec/changes/update-phase-8-manual-monitoring/tasks.md`; original completion
+> and verification snapshots below remain historical records.
+
 ## Batch 0 — Preflight and read-only audit
 
 - [x] Verify branch history, clean working tree, release baseline, lock, and
@@ -102,7 +107,7 @@
 
 ## Batch 6 — Streamlit and Plotly monitoring
 
-- [x] Add bounded Plotly dependency and retain existing Matplotlib support.
+- [x] Add a bounded Plotly dependency for Risk Lab and monitoring charts.
 - [x] Add `streamlit_ui` package and minimal navigation integration in `app.py`.
 - [x] Add Experiments list and archive-only lifecycle actions.
 - [x] Add Create Forward Test with methodology preview and strict cutoff checks.

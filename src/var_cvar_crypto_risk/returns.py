@@ -11,7 +11,7 @@ def calculate_simple_returns(prices: pd.DataFrame) -> pd.DataFrame:
 
     Drops the first row (NaN from the shift). Returns a clean DataFrame.
     """
-    returns = prices.pct_change()
+    returns = prices.pct_change(fill_method=None)
     returns = returns.iloc[1:]
     return returns
 
@@ -47,9 +47,7 @@ def calculate_returns(
         return calculate_simple_returns(prices)
     if method == "log":
         return calculate_log_returns(prices)
-    raise ValueError(
-        f"Unknown return method '{method}'. Use 'simple' or 'log'."
-    )
+    raise ValueError(f"Unknown return method '{method}'. Use 'simple' or 'log'.")
 
 
 def calculate_cumulative_returns(

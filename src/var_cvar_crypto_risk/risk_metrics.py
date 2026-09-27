@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pandas as pd
 from scipy import stats
 
@@ -18,12 +20,15 @@ def calculate_drawdown(portfolio_returns: pd.Series) -> pd.DataFrame:
     pandas.DataFrame
         Columns:
         - ``cumulative_return``: ``(1 + r).cumprod() - 1``
-        - ``rolling_max``: running maximum of ``cumulative_return``
-        - ``drawdown``: ``(cum - rolling_max) / (1 + rolling_max)``
+        - ``rolling_max``: running maximum cumulative return, including launch
+          wealth ``1.0`` as a zero-return peak
+        - ``drawdown``: ``wealth / running_peak_wealth - 1``
     """
-    cumulative = (1.0 + portfolio_returns).cumprod() - 1.0
-    rolling_max = cumulative.cummax()
-    drawdown = (cumulative - rolling_max) / (1.0 + rolling_max)
+    wealth = (1.0 + portfolio_returns).cumprod()
+    cumulative = wealth - 1.0
+    running_peak_wealth = wealth.cummax().clip(lower=1.0)
+    rolling_max = running_peak_wealth - 1.0
+    drawdown = wealth / running_peak_wealth - 1.0
     return pd.DataFrame(
         {
             "cumulative_return": cumulative,
@@ -118,8 +123,15 @@ def generate_risk_summary(
     cvar_methods: list[str],
     periods_per_year: int = 365,
     return_method: str = "simple",
+    risk_base_value: float | None = None,
+    risk_base_date: object | None = None,
+    risk_base_type: str | None = None,
 ) -> pd.DataFrame:
-    """Generate the complete risk summary table.
+    """Generate the legacy low-level risk summary table.
+
+    This API is retained for backward compatibility and focused estimator use.
+    It is not the authoritative application or publication Risk Summary; those
+    workflows use ``HistoricalRiskSummary`` from an explicit portfolio path.
 
     Returns
     -------
@@ -133,6 +145,11 @@ def generate_risk_summary(
         raise ValueError(
             f"return_method must be 'simple' or 'log', got {return_method}."
         )
+    money_base = initial_capital if risk_base_value is None else float(risk_base_value)
+    if not math.isfinite(money_base) or money_base <= 0.0:
+        raise ValueError("risk_base_value must be finite and positive")
+    if risk_base_value is not None and not str(risk_base_type or "").strip():
+        raise ValueError("risk_base_type is required when risk_base_value is supplied")
     stats_dict = calculate_distribution_stats(
         portfolio_returns, periods_per_year=periods_per_year
     )
@@ -187,7 +204,7 @@ def generate_risk_summary(
 
     for method in var_methods:
         var_pct = calculate_var(portfolio_returns, method, confidence_level)
-        money_var = return_var_to_money_var(var_pct, initial_capital)
+        money_var = return_var_to_money_var(var_pct, money_base)
         label = _format_method_label(method)
         rows.append(
             {
@@ -206,7 +223,7 @@ def generate_risk_summary(
 
     for method in cvar_methods:
         cvar_pct = calculate_cvar(portfolio_returns, method, confidence_level)
-        money_cvar = return_cvar_to_money_cvar(cvar_pct, initial_capital)
+        money_cvar = return_cvar_to_money_cvar(cvar_pct, money_base)
         label = _format_method_label(method)
         rows.append(
             {
@@ -223,4 +240,9 @@ def generate_risk_summary(
             }
         )
 
-    return pd.DataFrame(rows, columns=["Metric", "Value", "Unit"])
+    result = pd.DataFrame(rows, columns=["Metric", "Value", "Unit"])
+    if risk_base_value is not None:
+        result["Risk Base Value"] = money_base
+        result["Risk Base Date"] = risk_base_date
+        result["Risk Base Type"] = str(risk_base_type)
+    return result

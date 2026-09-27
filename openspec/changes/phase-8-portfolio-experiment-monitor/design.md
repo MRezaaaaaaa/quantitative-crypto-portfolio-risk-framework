@@ -1,5 +1,10 @@
 # Phase 8 design — Portfolio Experiment Registry and Forward-Testing Monitor
 
+> Construction update (2026-09-18): new experiments are manual-only. Optimizer
+> construction in this original design is retained for existing saved records,
+> not new creation. See `openspec/specs/portfolio-experiment-monitor/spec.md`
+> and `openspec/changes/update-phase-8-manual-monitoring/` for the current contract.
+
 ## 1. Design goals
 
 Phase 8 turns a validated optimizer result into an auditable research
@@ -48,7 +53,7 @@ The design is based on the repository at `main` commit `594061e`, with the
 5. Existing source clients provide research data but do not expose a unified,
    persistable source contract or complete-data timestamp. Live/hybrid creation
    must reject a source that cannot be refreshed reproducibly.
-6. Existing plotting is Matplotlib and large. New monitoring charts use Plotly
+6. Risk Lab and monitoring chart builders use Plotly
    in a separate package and receive chart-ready data only.
 7. There is no database, migration, repository, transaction, lifecycle, or
    correction policy.
