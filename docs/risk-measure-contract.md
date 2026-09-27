@@ -48,6 +48,12 @@ when both values are negative.
   supplied portfolio value.
 - Portfolio value must be finite and non-negative.
 
+When Risk Lab labels a monetary number as **current portfolio risk**, the
+portfolio value is the selected policy's latest finalized net NAV, not launch
+capital. Its value, date, `current_net_nav` type, policy and methodology version
+are displayed/exported. Initial capital remains the base for launch-to-date
+cumulative performance, not an implicit current-risk multiplier.
+
 The monetary multiplication is exact when the metric is a simple-return loss
 fraction. For a metric estimated from log returns, it is only a first-order
 linearized equivalent. In particular, transforming an average log-tail loss is
@@ -56,6 +62,25 @@ the log-return result as linearized rather than exact tail P&L.
 
 For example, a signed loss value of `-0.02` on a portfolio value of `100,000`
 produces `-2,000`, meaning a 2,000-unit gain at the measured tail threshold.
+
+## Finalized historical sample
+
+Risk Summary first partitions source prices by UTC calendar date. Rows dated on
+or after the injected current UTC date are provisional: they remain auditable
+source observations but do not enter finalized NAV, returns, drawdown, VaR,
+CVaR, or sample counts. Historical rows strictly before that date are unchanged.
+At least two finalized price observations are required.
+
+The authoritative Risk Summary export is long-form with columns `Record Type`,
+`Section`, `Name`, `Value`, `Display Value`, `Unit`, and `Sample Size`. The raw
+`Value` is not parsed back from a formatted label. Streamlit and publication
+bundles consume the same policy-specific summary object, so UI and CSV cannot
+silently select different histories or formulas.
+
+`generate_risk_summary` remains a backward-compatible low-level utility. It is
+not the authoritative Risk Lab or publication summary and must not be used to
+reintroduce annualized return, annualized volatility, Sharpe, or a second
+maximum-drawdown calculation into those outputs.
 
 ## Horizon
 

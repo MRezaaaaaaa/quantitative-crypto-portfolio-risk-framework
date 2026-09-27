@@ -8,15 +8,14 @@ Run from the project root:
 from __future__ import annotations
 
 import io
+import json
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
+import plotly.graph_objects as go  # noqa: E402
 import streamlit as st  # noqa: E402
 import yaml  # noqa: E402
 
@@ -42,6 +41,13 @@ from var_cvar_crypto_risk.assumptions import (  # noqa: E402
     build_assumption_table,
     build_volatility_table,
 )
+from var_cvar_crypto_risk.assumption_charts import (  # noqa: E402
+    DEFAULT_EXPECTED_RETURN_VIEW_MODE,
+    EXPECTED_RETURN_COMPARISONS,
+    EXPECTED_RETURN_VIEW_MODES,
+    build_expected_return_dumbbell,
+    build_expected_return_estimator_comparison,
+)
 from var_cvar_crypto_risk.correlation import (  # noqa: E402
     calculate_correlation_matrix,
     calculate_rolling_average_correlation,
@@ -53,6 +59,11 @@ from var_cvar_crypto_risk.covariance import (  # noqa: E402
 )
 from var_cvar_crypto_risk.cvar_models import calculate_cvar  # noqa: E402
 from var_cvar_crypto_risk.data_loader import validate_price_data  # noqa: E402
+from var_cvar_crypto_risk.historical_summary import (  # noqa: E402
+    build_historical_risk_summary,
+    format_historical_table as _format_historical_table_contract,
+    partition_historical_prices,
+)
 from var_cvar_crypto_risk.monte_carlo import (  # noqa: E402
     calculate_portfolio_scenario_returns,
     compare_all_risk_methods,
@@ -82,9 +93,7 @@ from var_cvar_crypto_risk.plotting import (  # noqa: E402
     plot_asset_return_distributions,
     plot_breach_timeline,
     plot_correlation_heatmap,
-    plot_cumulative_returns,
     plot_cvar_efficient_frontier,
-    plot_drawdown,
     plot_mc_loss_distribution,
     plot_mc_portfolio_paths,
     plot_model_comparison_backtest,
@@ -95,15 +104,25 @@ from var_cvar_crypto_risk.plotting import (  # noqa: E402
     plot_return_distribution_with_var_cvar,
     plot_rolling_average_correlation,
     plot_rolling_breach_rate,
-    plot_tail_zoom_distribution,
     plot_var_backtest,
     plot_var_cvar_method_comparison,
 )
 from var_cvar_crypto_risk.portfolio import (  # noqa: E402
-    calculate_portfolio_returns,
-    calculate_portfolio_value,
     normalize_weights,
     validate_weights,
+)
+from var_cvar_crypto_risk.portfolio_path import (  # noqa: E402
+    PORTFOLIO_PATH_VERSION,
+    PortfolioEvolutionPolicy,
+    PortfolioPathConfig,
+    build_portfolio_path,
+)
+from var_cvar_crypto_risk.portfolio_path_charts import (  # noqa: E402
+    plot_comparative_drawdown,
+    plot_gross_vs_net_nav,
+    plot_hold_vs_selected_nav,
+    plot_turnover_and_costs,
+    plot_weights_drift_and_rebalances,
 )
 from var_cvar_crypto_risk.preprocessing import clean_price_data  # noqa: E402
 from var_cvar_crypto_risk.return_conventions import (  # noqa: E402
@@ -115,11 +134,8 @@ from var_cvar_crypto_risk.returns import (  # noqa: E402
 )
 from var_cvar_crypto_risk.risk_metrics import (  # noqa: E402
     calculate_asset_drawdowns,
-    calculate_max_drawdown,
-    generate_risk_summary,
 )
 from var_cvar_crypto_risk.risk_conventions import (  # noqa: E402
-    LOSS_SPACE_CONVENTION,
     loss_value_to_money,
 )
 from var_cvar_crypto_risk.streamlit_ui import (  # noqa: E402
@@ -143,7 +159,7 @@ METHOD_LABELS = {
     "gaussian": "Gaussian",
     "cornish_fisher": "Cornish-Fisher",
 }
-RETURN_CONTRACT_VERSION = 1
+RETURN_CONTRACT_VERSION = 3
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────
@@ -163,6 +179,57 @@ def _load_default_assets() -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def _portfolio_path_metadata(provenance: dict) -> dict[str, object]:
+    """Flatten path provenance for CSV/table exports."""
+    policy = str(provenance["policy"])
+    frequency = {
+        "buy_and_hold": "none",
+        "daily_rebalance": "daily",
+        "weekly_rebalance": "weekly",
+        "monthly_rebalance": "monthly",
+        "quarterly_rebalance": "quarterly",
+    }.get(policy, policy)
+    return {
+        "portfolio_policy": policy,
+        "rebalance_frequency": frequency,
+        "initial_or_target_weights": json.dumps(
+            provenance["target_weights"], sort_keys=True
+        ),
+        "execution_convention": provenance["execution_convention"],
+        "commission_bps": provenance["commission_bps"],
+        "slippage_bps": provenance["slippage_bps"],
+        "missing_price_policy": provenance["missing_price_policy"],
+        "portfolio_path_methodology_version": provenance["methodology_version"],
+        "risk_base_value": provenance["risk_base_value"],
+        "risk_base_date": provenance["risk_base_date"],
+        "risk_base_type": provenance["risk_base_type"],
+    }
+
+
+def _with_portfolio_path_metadata(
+    frame: pd.DataFrame, provenance: dict
+) -> pd.DataFrame:
+    """Return an export copy carrying auditable portfolio-path provenance."""
+    result = frame.copy()
+    for column, value in _portfolio_path_metadata(provenance).items():
+        result[column] = value
+    return result
+
+
+def _portfolio_path_caption(provenance: dict) -> str:
+    """Human-readable provenance shared by advanced Risk Lab outputs."""
+    metadata = _portfolio_path_metadata(provenance)
+    return (
+        f"Portfolio basis: **{metadata['portfolio_policy']}** · rebalance: "
+        f"**{metadata['rebalance_frequency']}** · commission "
+        f"**{float(metadata['commission_bps']):.1f} bps** · slippage "
+        f"**{float(metadata['slippage_bps']):.1f} bps** · current risk base "
+        f"**{_format_money(float(metadata['risk_base_value']))}** at "
+        f"**{metadata['risk_base_date']}** · methodology "
+        f"**{metadata['portfolio_path_methodology_version']}**."
+    )
 
 
 CONFIG_PATH = PROJECT_ROOT / "configs" / "config.yaml"
@@ -300,7 +367,7 @@ def _fetch_prices(
             "assets were dropped. Check the vendor ID / ticker."
         )
     prices = prices[available]
-    cleaned = clean_price_data(prices)
+    cleaned = clean_price_data(prices, preserve_missing=True)
     validate_price_data(cleaned)
     return cleaned, used_source, tuple(warnings)
 
@@ -356,16 +423,44 @@ def _df_to_csv_bytes(df: pd.DataFrame, include_index: bool = True) -> bytes:
     return buf.getvalue().encode("utf-8")
 
 
-def _fig_to_png_bytes(fig: plt.Figure) -> bytes:
-    buf = io.BytesIO()
-    fig.savefig(
-        buf, format="png", dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor()
+def _render_plotly_chart(
+    figure: go.Figure,
+    *,
+    key: str,
+    file_stem: str,
+    html_download: bool = True,
+) -> None:
+    """Render a reusable Plotly figure with client-side PNG export."""
+    st.plotly_chart(
+        figure,
+        width="stretch",
+        key=key,
+        config={
+            "displaylogo": False,
+            "toImageButtonOptions": {
+                "format": "png",
+                "filename": file_stem,
+                "scale": 2,
+            },
+        },
     )
-    return buf.getvalue()
+    if html_download:
+        st.download_button(
+            "⬇️ Download interactive HTML",
+            data=figure.to_html(include_plotlyjs=True, full_html=True).encode("utf-8"),
+            file_name=f"{file_stem}.html",
+            mime="text/html",
+            key=f"download_html_{key}",
+        )
 
 
 def _format_money(value: float) -> str:
     return f"${value:,.0f}"
+
+
+def _format_historical_table(frame: pd.DataFrame) -> pd.DataFrame:
+    """Delegate UI formatting to the Historical Risk Summary contract."""
+    return _format_historical_table_contract(frame)
 
 
 # ─── Page setup ───────────────────────────────────────────────────────────
@@ -456,6 +551,53 @@ with st.sidebar:
     auto_normalize = st.checkbox("Auto-normalize weights to 1.0", value=True)
     allow_short = st.checkbox("Allow short selling (negative weights)", value=False)
 
+    portfolio_policy_label = st.selectbox(
+        "Portfolio evolution policy",
+        [
+            "Buy & Hold — fixed quantities",
+            "Periodic rebalance to target weights",
+            "Daily rebalanced — legacy constant-weight model",
+        ],
+        help=(
+            "This setting is independent of the VaR/risk horizon. The launch "
+            "allocation is treated as already established and has no setup cost."
+        ),
+    )
+    periodic_frequency = "monthly"
+    if portfolio_policy_label == "Periodic rebalance to target weights":
+        periodic_frequency = st.selectbox(
+            "Rebalance frequency",
+            ["weekly", "monthly", "quarterly"],
+            format_func=lambda value: value.title(),
+        )
+    is_rebalanced_policy = portfolio_policy_label != "Buy & Hold — fixed quantities"
+    if is_rebalanced_policy:
+        cost_cols = st.columns(2)
+        commission_bps = cost_cols[0].number_input(
+            "Commission (bps)", min_value=0.0, value=0.0, step=1.0
+        )
+        slippage_bps = cost_cols[1].number_input(
+            "Slippage (bps)", min_value=0.0, value=0.0, step=1.0
+        )
+        st.caption(
+            "Rebalances execute at a complete UTC close. Weekly/monthly/quarterly "
+            "means the last observed date of a completed UTC period. If required "
+            "prices are missing, execution is deferred and audited. Close execution "
+            "is an idealized research mark, not evidence of an executable fill."
+        )
+    else:
+        commission_bps = 0.0
+        slippage_bps = 0.0
+
+    if portfolio_policy_label == "Buy & Hold — fixed quantities":
+        portfolio_path_policy = PortfolioEvolutionPolicy.BUY_AND_HOLD
+    elif portfolio_policy_label == "Daily rebalanced — legacy constant-weight model":
+        portfolio_path_policy = PortfolioEvolutionPolicy.DAILY_REBALANCE
+    else:
+        portfolio_path_policy = PortfolioEvolutionPolicy(
+            f"{periodic_frequency}_rebalance"
+        )
+
     st.divider()
     st.subheader("Risk parameters")
     confidence_level = st.slider(
@@ -488,7 +630,12 @@ with st.sidebar:
 st.subheader("📊 Portfolio")
 st.caption(
     "Edit asset symbols, vendor IDs, and weights below. "
-    "Weights should sum to 1.0 (auto-normalized if enabled in the sidebar)."
+    + (
+        "These are initial weights at launch; quantities then remain fixed. "
+        if portfolio_path_policy is PortfolioEvolutionPolicy.BUY_AND_HOLD
+        else "These are target weights restored after each rebalance. "
+    )
+    + "Weights should sum to 1.0 (auto-normalized if enabled in the sidebar)."
 )
 
 if "assets_df" not in st.session_state:
@@ -502,7 +649,7 @@ if "assets_df" not in st.session_state:
 assets_df = st.data_editor(
     st.session_state["assets_df"],
     num_rows="dynamic",
-    use_container_width=True,
+    width="stretch",
     column_config={
         "Weight": st.column_config.NumberColumn(
             "Weight", min_value=-2.0, max_value=2.0, step=0.05, format="%.4f"
@@ -533,7 +680,7 @@ if "opt_results" not in st.session_state:
 if "assumptions_results" not in st.session_state:
     st.session_state["assumptions_results"] = None
 
-run = st.button("▶️ Run risk analysis", type="primary", use_container_width=True)
+run = st.button("▶️ Run risk analysis", type="primary", width="stretch")
 
 
 # ─── Main analysis ────────────────────────────────────────────────────────
@@ -551,7 +698,7 @@ if run:
             st.stop()
 
         with st.spinner("Fetching prices…"):
-            prices, used_source, fetch_warnings = _fetch_prices(
+            raw_prices, used_source, fetch_warnings = _fetch_prices(
                 source=source,
                 fallback="yfinance" if fallback_enabled else "",
                 assets_records=assets_records,
@@ -560,12 +707,21 @@ if run:
                 end_date=end_date.strftime("%Y-%m-%d"),
             )
 
-        if prices.shape[1] < 1 or len(prices) < 5:
+        if raw_prices.shape[1] < 1 or len(raw_prices) < 5:
             st.error(
-                f"Not enough price data (rows={len(prices)}, "
-                f"cols={prices.shape[1]}). Widen the date range."
+                f"Not enough price data (rows={len(raw_prices)}, "
+                f"cols={raw_prices.shape[1]}). Widen the date range."
             )
             st.stop()
+
+        analysis_now_utc = datetime.now(timezone.utc)
+        price_partition = partition_historical_prices(
+            raw_prices,
+            now_utc=analysis_now_utc,
+            minimum_finalized_observations=5,
+        )
+        prices = price_partition.finalized
+        provisional_prices = price_partition.provisional
 
         weights = pd.Series(
             {row["Symbol"]: float(row["Weight"]) for row in assets_records},
@@ -580,38 +736,61 @@ if run:
             allow_short_selling=allow_short,
         )
 
+        complete_prices = prices.dropna(how="any")
+        if len(complete_prices) < 5:
+            raise ValueError(
+                "Fewer than five complete cross-asset price observations remain."
+            )
         asset_returns = calculate_returns(
-            prices,
+            complete_prices,
             method=return_policy.portfolio_method,
         )
-        portfolio_returns = calculate_portfolio_returns(
-            asset_returns,
+        path_config = PortfolioPathConfig(
+            initial_capital=float(initial_capital),
+            policy=portfolio_path_policy,
+            commission_bps=float(commission_bps),
+            slippage_bps=float(slippage_bps),
+        )
+        portfolio_path = build_portfolio_path(prices, weights, path_config)
+        hold_path = build_portfolio_path(
+            prices,
             weights,
-            return_method=return_policy.portfolio_method,
+            PortfolioPathConfig(
+                initial_capital=float(initial_capital),
+                policy=PortfolioEvolutionPolicy.BUY_AND_HOLD,
+            ),
         )
-        portfolio_value = calculate_portfolio_value(
-            portfolio_returns,
-            initial_capital,
-            return_method=return_policy.wealth_method,
-        )
+        portfolio_returns = portfolio_path.net_returns
+        portfolio_value = portfolio_path.portfolio.loc[
+            portfolio_path.portfolio["finalized"], "net_nav"
+        ].rename("portfolio_value")
+        current_policy_weights = portfolio_path.latest_weights
+        risk_base_value = portfolio_path.latest_net_nav
+        risk_base_date = portfolio_path.latest_date.date()
         diagnostic_asset_returns = (
             asset_returns
             if return_policy.diagnostic_method == "simple"
-            else calculate_returns(prices, method="log")
+            else calculate_returns(complete_prices, method="log")
         )
-        diagnostic_portfolio_returns = calculate_portfolio_returns(
-            diagnostic_asset_returns,
-            weights,
-            return_method=return_policy.diagnostic_method,
+        diagnostic_portfolio_returns = (
+            portfolio_returns
+            if return_policy.diagnostic_method == "simple"
+            else pd.Series(
+                np.log1p(portfolio_returns.to_numpy(dtype=float)),
+                index=portfolio_returns.index,
+                name="portfolio_return",
+            )
         )
 
-        risk_summary = generate_risk_summary(
-            portfolio_returns=portfolio_returns,
+        historical_summary = build_historical_risk_summary(
+            path=portfolio_path,
+            prices=raw_prices,
+            price_source=used_source,
+            return_convention="Simple close-to-close net portfolio returns",
             confidence_level=confidence_level,
-            initial_capital=initial_capital,
             var_methods=selected_var_methods,
             cvar_methods=selected_cvar_methods,
-            return_method=return_policy.portfolio_method,
+            now_utc=analysis_now_utc,
         )
     except CoinGeckoError as exc:
         st.error(f"CoinGecko error: {exc}")
@@ -629,12 +808,22 @@ if run:
     st.session_state["risk_results"] = {
         "return_contract_version": RETURN_CONTRACT_VERSION,
         "prices": prices,
+        "raw_prices": raw_prices,
+        "provisional_prices": provisional_prices,
         "asset_returns": asset_returns,
         "portfolio_returns": portfolio_returns,
+        "portfolio_path": portfolio_path,
+        "hold_path": hold_path,
+        "portfolio_path_version": PORTFOLIO_PATH_VERSION,
+        "portfolio_path_provenance": portfolio_path.provenance(),
+        "current_policy_weights": current_policy_weights,
+        "risk_base_value": risk_base_value,
+        "risk_base_date": risk_base_date,
+        "risk_base_type": "current_net_nav",
         "diagnostic_asset_returns": diagnostic_asset_returns,
         "diagnostic_portfolio_returns": diagnostic_portfolio_returns,
         "portfolio_value": portfolio_value,
-        "risk_summary": risk_summary,
+        "historical_summary": historical_summary,
         "used_source": used_source,
         "selected_assets": list(prices.columns),
         "weights": weights,
@@ -653,9 +842,9 @@ if run:
     st.session_state["assumptions_results"] = None
 
 results = st.session_state.get("risk_results")
-if (
-    results is not None
-    and results.get("return_contract_version") != RETURN_CONTRACT_VERSION
+if results is not None and (
+    results.get("return_contract_version") != RETURN_CONTRACT_VERSION
+    or results.get("portfolio_path_version") != PORTFOLIO_PATH_VERSION
 ):
     st.session_state["risk_results"] = None
     st.session_state["backtest_results"] = None
@@ -664,29 +853,43 @@ if (
     st.session_state["assumptions_results"] = None
     results = None
     st.info(
-        "The return-convention contract changed. Run the analysis again to "
-        "rebuild all results with Simple-return core inputs."
+        "The return/portfolio-path methodology changed. Run the analysis again "
+        "to rebuild results under an explicit evolution policy."
     )
 if results is None:
     st.info("Configure inputs in the sidebar and click **Run risk analysis**.")
     st.stop()
 
+for derived_state_key in ("backtest_results", "mc_results", "opt_results"):
+    derived_state = st.session_state.get(derived_state_key)
+    if (
+        derived_state is not None
+        and derived_state.get("portfolio_path_version") != PORTFOLIO_PATH_VERSION
+    ):
+        st.session_state[derived_state_key] = None
+
 prices = results["prices"]
+raw_prices = results.get("raw_prices", prices)
+provisional_prices = results.get("provisional_prices", prices.iloc[0:0])
 asset_returns = results["asset_returns"]
 portfolio_returns = results["portfolio_returns"]
+portfolio_path = results["portfolio_path"]
+hold_path = results["hold_path"]
+current_policy_weights = results["current_policy_weights"]
 diagnostic_asset_returns = results.get("diagnostic_asset_returns", asset_returns)
 diagnostic_portfolio_returns = results.get(
     "diagnostic_portfolio_returns", portfolio_returns
 )
 portfolio_value = results["portfolio_value"]
-risk_summary = results["risk_summary"]
+historical_summary = results["historical_summary"]
 used_source = results["used_source"]
-weights = results["weights"]
 confidence_level = results["confidence_level"]
-initial_capital = results["initial_value"]
 selected_var_methods = results["selected_var_methods"]
 selected_cvar_methods = results["selected_cvar_methods"]
 horizon_days = results["horizon_days"]
+risk_base_value = float(results["risk_base_value"])
+risk_base_date = results["risk_base_date"]
+risk_base_type = results["risk_base_type"]
 return_handling_mode = results.get("return_handling_mode", "automatic")
 diagnostic_return_method = results.get(
     "diagnostic_return_method",
@@ -697,70 +900,29 @@ diagnostic_return_method = results.get(
 # ─── Run summary ──────────────────────────────────────────────────────────
 
 st.success(
-    f"Loaded {len(prices):,} price rows × {prices.shape[1]} assets "
-    f"from **{used_source}** ({prices.index.min().date()} → {prices.index.max().date()})."
+    f"Loaded {len(raw_prices):,} source price rows × {prices.shape[1]} assets "
+    f"from **{used_source}**; finalized historical analysis uses {len(prices):,} "
+    f"rows ({prices.index.min().date()} → {prices.index.max().date()})."
 )
+if not provisional_prices.empty:
+    st.info(
+        f"Excluded {len(provisional_prices):,} provisional current/future UTC "
+        "row(s) from finalized NAV, returns, drawdown and VaR/CVaR."
+    )
 st.caption(
     "Return conventions — core portfolio/NAV/scenarios/optimization: "
     f"**Simple** · diagnostics: **{diagnostic_return_method.title()}** · "
     f"mode: **{return_handling_mode.title()}**"
 )
-
-obs = len(portfolio_returns)
-cum_return = float((1.0 + portfolio_returns).prod() - 1.0)
-ann_vol = float(portfolio_returns.std(ddof=1)) * (365**0.5)
-max_dd = calculate_max_drawdown(portfolio_returns)
-
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Observations", f"{obs:,}")
-m2.metric("Cumulative return", f"{cum_return * 100:.2f}%")
-m3.metric("Ann. volatility", f"{ann_vol * 100:.2f}%")
-m4.metric("Max drawdown", f"{max_dd * 100:.2f}%")
-
-
-# ─── Headline VaR / CVaR cards ────────────────────────────────────────────
-
-st.subheader(f"🎯 VaR & CVaR at {confidence_level * 100:.1f}% confidence")
 st.caption(
-    f"Sign convention — {LOSS_SPACE_CONVENTION} Headline risk uses simple "
-    "portfolio returns."
+    f"Portfolio path — **{portfolio_path.config.policy.value}** · "
+    f"commission **{portfolio_path.config.commission_bps:.1f} bps** · "
+    f"slippage **{portfolio_path.config.slippage_bps:.1f} bps** · "
+    f"methodology **{portfolio_path.config.methodology_version}**. Risk horizon "
+    "does not control the rebalance calendar."
 )
-
-import numpy as np  # noqa: E402
-
-scale = float(np.sqrt(horizon_days))
-horizon_label = f"{horizon_days}-day" if horizon_days != 1 else "1-day"
-
-card_cols = st.columns(max(1, len(selected_var_methods) + len(selected_cvar_methods)))
-idx = 0
-for method in selected_var_methods:
-    var_pct = calculate_var(portfolio_returns, method, confidence_level) * scale
-    money_var = loss_value_to_money(var_pct, initial_capital)
-    card_cols[idx].metric(
-        f"{METHOD_LABELS[method]} VaR ({horizon_label})",
-        f"{var_pct * 100:.2f}%",
-        delta=_format_money(money_var),
-        delta_color="off",
-    )
-    idx += 1
-for method in selected_cvar_methods:
-    cvar_pct = calculate_cvar(portfolio_returns, method, confidence_level) * scale
-    money_cvar = loss_value_to_money(cvar_pct, initial_capital)
-    card_cols[idx].metric(
-        f"{METHOD_LABELS[method]} CVaR ({horizon_label})",
-        f"{cvar_pct * 100:.2f}%",
-        delta=_format_money(money_cvar),
-        delta_color="off",
-    )
-    idx += 1
-
-if horizon_days > 1:
-    st.caption(
-        f"⚠️ Headline cards are **√t-scaled daily** VaR/CVaR "
-        f"(daily × √{horizon_days}, i.i.d. approximation). The Distribution "
-        f"tab shows **realised {horizon_days}-day** returns instead — the "
-        "two conventions can legitimately differ."
-    )
+for path_warning in portfolio_path.warnings:
+    st.warning(path_warning)
 
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────
@@ -792,17 +954,115 @@ if horizon_days > 1:
 )
 
 with tab_summary:
+    st.subheader("Historical Analysis Context")
     st.caption(
-        "All VaR/CVaR figures in this table are **1-day (daily)** at the "
-        "selected confidence level, computed from daily portfolio returns. "
-        "Return/volatility rows state their own horizon (daily or "
-        "annualized) in the metric name."
+        "Historical descriptive analysis of the selected portfolio path. "
+        "These results are not forecasts of future performance."
     )
-    st.dataframe(risk_summary, use_container_width=True, hide_index=True)
+    context_display = historical_summary.context.copy()
+    context_display["Value"] = context_display["Value"].map(str)
+    st.dataframe(
+        context_display,
+        width="stretch",
+        hide_index=True,
+    )
+
+    if historical_summary.quality.is_clean:
+        st.success("Historical data-quality checks passed for a complete daily sample.")
+    else:
+        for quality_warning in historical_summary.quality.warnings():
+            st.warning(quality_warning)
+    with st.expander(
+        "Data-quality audit", expanded=not historical_summary.quality.is_clean
+    ):
+        quality_display = historical_summary.quality.rows()
+        quality_display["Result"] = quality_display["Result"].map(str)
+        st.dataframe(
+            quality_display,
+            width="stretch",
+            hide_index=True,
+        )
+        if historical_summary.quality.non_one_day_intervals:
+            interval_rows = pd.DataFrame(
+                historical_summary.quality.non_one_day_intervals,
+                columns=["Previous finalized date", "Current finalized date", "Days"],
+            )
+            st.dataframe(interval_rows, width="stretch", hide_index=True)
+
+    primary = historical_summary.primary.set_index("Metric")["Value"]
+    first_cards = st.columns(3)
+    first_cards[0].metric("Ending Net NAV", _format_money(primary["Ending Net NAV"]))
+    first_cards[1].metric(
+        "Net Cumulative Return", f"{float(primary['Net Cumulative Return']):.2%}"
+    )
+    first_cards[2].metric(
+        "Maximum Drawdown", f"{float(primary['Maximum Drawdown']):.2%}"
+    )
+    second_cards = st.columns(3)
+    second_cards[0].metric(
+        "Total Transaction Costs",
+        f"${float(primary['Total Transaction Costs']):,.2f}",
+    )
+    second_cards[1].metric("Historical Period", str(primary["Historical Period"]))
+    second_cards[2].metric(
+        "Finalized Observations", f"{int(primary['Finalized Observations']):,}"
+    )
+
+    st.subheader("Historical Descriptive Statistics")
+    st.caption(
+        "Sample descriptions of finalized net returns under the selected policy; "
+        "they are not expected-return or volatility forecasts."
+    )
+    st.dataframe(
+        _format_historical_table(historical_summary.descriptive),
+        width="stretch",
+        hide_index=True,
+    )
+
+    with st.expander("Distribution Shape", expanded=False):
+        st.caption(
+            "Sample skewness and sample excess kurtosis are descriptive moments "
+            "and can be highly sensitive to extreme observations."
+        )
+        st.dataframe(
+            _format_historical_table(historical_summary.distribution_shape),
+            width="stretch",
+            hide_index=True,
+        )
+
+    st.subheader("Historical Tail Distribution")
+    st.caption(
+        "These statistics describe the observed historical return distribution. "
+        "They are not forecasts of future losses. Monetary equivalents scale a "
+        "historical percentage statistic by ending NAV; they are not realized "
+        "historical losses."
+    )
+    st.dataframe(
+        _format_historical_table(historical_summary.tail_distribution),
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "Metric": st.column_config.TextColumn(
+                "Metric",
+                width="medium",
+                help=(
+                    "A monetary equivalent at ending NAV scales a historical "
+                    "percentage statistic by ending NAV; it is not a realized "
+                    "historical loss."
+                ),
+            ),
+            "Value": st.column_config.TextColumn("Value", width="small"),
+            "Unit": st.column_config.TextColumn("Unit", width="small"),
+            "Sample Size": st.column_config.NumberColumn(
+                "Sample Size", width="small", format="%d"
+            ),
+        },
+    )
+
     st.download_button(
-        "⬇️ Download risk_summary.csv",
-        data=_df_to_csv_bytes(risk_summary, include_index=False),
-        file_name="risk_summary.csv",
+        "⬇️ Download historical_risk_summary.csv",
+        data=_df_to_csv_bytes(historical_summary.export, include_index=False),
+        file_name="historical_risk_summary.csv",
         mime="text/csv",
     )
 
@@ -814,8 +1074,8 @@ label, different basis — this table is the reference:
 
 | Where | Convention | Basis |
 |---|---|---|
-| Risk summary table (this tab) | **Daily** VaR/CVaR | Daily returns |
-| Headline cards (top of page) | Daily × √{int(horizon_days)} (**√t-scaled**) | i.i.d. approximation |
+| Risk summary (this tab) | **Historical finalized path** | Net NAV and policy returns |
+| Historical Tail Distribution | **Finalized historical return sample** | Policy-specific net returns; data-quality warnings apply |
 | Distribution tab | **Realised {int(horizon_days)}-day** returns | Overlapping horizon returns |
 | Backtesting tab | Horizon selected in that tab | Rolling / non-overlapping realised returns |
 | Monte Carlo tab | **Simulated h-day** scenarios | Mean/cov scaled ×h (i.i.d.) |
@@ -890,39 +1150,23 @@ with tab_dist:
                     f"{horizon_label} Return Distribution — "
                     f"{METHOD_LABELS[primary_var]} VaR & "
                     f"{METHOD_LABELS[primary_cvar]} CVaR"
+                    f"<br><sup>Historical · "
+                    f"{portfolio_path.config.policy.value}</sup>"
                 ),
                 xlabel=f"{horizon_label} Return",
                 extra_var_lines=extra_lines,
+                provenance=results["portfolio_path_provenance"],
             )
-            st.pyplot(fig, use_container_width=True)
-            st.download_button(
-                "⬇️ Download distribution chart (PNG)",
-                data=_fig_to_png_bytes(fig),
-                file_name="return_distribution_var_cvar.png",
-                mime="image/png",
-                key="dl_dist_portfolio",
+            _render_plotly_chart(
+                fig,
+                key="plot_dist_portfolio",
+                file_stem="return_distribution_var_cvar",
             )
-            plt.close(fig)
 
         if dist_scope in ("Asset-level", "Both"):
-            fig_assets = plot_asset_return_distributions(
-                diagnostic_asset_returns,
-                horizon_days=h,
-                confidence_level=confidence_level,
-                return_method=diagnostic_return_method,
-            )
-            st.pyplot(fig_assets, use_container_width=True)
-            st.download_button(
-                "⬇️ Download asset distributions (PNG)",
-                data=_fig_to_png_bytes(fig_assets),
-                file_name="asset_return_distributions.png",
-                mime="image/png",
-                key="dl_dist_assets",
-            )
-            plt.close(fig_assets)
-
-            # Asset-level risk table (historical, horizon-matched).
             asset_risk_rows = []
+            asset_horizon_returns: dict[str, pd.Series] = {}
+            asset_risk_levels: dict[str, dict[str, float]] = {}
             for asset in diagnostic_asset_returns.columns:
                 a_series = _horizon_returns_cached(
                     diagnostic_asset_returns[asset].dropna(),
@@ -931,6 +1175,8 @@ with tab_dist:
                 )
                 a_var = calculate_var(a_series, "historical", confidence_level)
                 a_cvar = calculate_cvar(a_series, "historical", confidence_level)
+                asset_horizon_returns[str(asset)] = a_series
+                asset_risk_levels[str(asset)] = {"var": a_var, "cvar": a_cvar}
                 asset_risk_rows.append(
                     {
                         "Asset": asset,
@@ -939,13 +1185,29 @@ with tab_dist:
                         f"{horizon_label} Vol (%)": float(a_series.std(ddof=1)) * 100.0,
                     }
                 )
+            horizon_asset_frame = pd.DataFrame(asset_horizon_returns)
+            fig_assets = plot_asset_return_distributions(
+                horizon_asset_frame,
+                horizon_days=h,
+                confidence_level=confidence_level,
+                return_method=diagnostic_return_method,
+                risk_levels=asset_risk_levels,
+                provenance=results["portfolio_path_provenance"],
+            )
+            _render_plotly_chart(
+                fig_assets,
+                key="plot_dist_assets",
+                file_stem="asset_return_distributions",
+            )
+
+            # Asset-level risk table (historical, horizon-matched).
             st.markdown(
                 f"**Asset-level historical risk "
                 f"({horizon_label}, {confidence_level * 100:.1f}% confidence)**"
             )
             st.dataframe(
                 pd.DataFrame(asset_risk_rows).round(2),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -957,19 +1219,9 @@ with tab_dist:
             fig_qq = plot_qq_vs_normal(
                 dist_returns,
                 title=f"QQ Plot vs Normal — {horizon_label} Portfolio Returns",
+                provenance=results["portfolio_path_provenance"],
             )
-            st.pyplot(fig_qq, use_container_width=True)
-            plt.close(fig_qq)
-
-        with st.expander("🔻 Left-tail zoom", expanded=False):
-            fig_tail = plot_tail_zoom_distribution(
-                dist_returns,
-                var_value=var_value,
-                cvar_value=cvar_value,
-                confidence_level=confidence_level,
-            )
-            st.pyplot(fig_tail, use_container_width=True)
-            plt.close(fig_tail)
+            _render_plotly_chart(fig_qq, key="plot_qq", file_stem="historical_qq_plot")
 
         with st.expander("📖 How each method is calculated", expanded=False):
             st.markdown(
@@ -993,68 +1245,88 @@ with tab_dist:
         st.info("Select at least one VaR and one CVaR method in the sidebar.")
 
 with tab_growth:
-    st.markdown("**Portfolio cumulative return**")
-    fig = plot_cumulative_returns(portfolio_returns)
-    st.pyplot(fig, use_container_width=True)
-    st.download_button(
-        "⬇️ Download cumulative returns chart (PNG)",
-        data=_fig_to_png_bytes(fig),
-        file_name="cumulative_returns.png",
-        mime="image/png",
-        key="dl_cum_portfolio",
+    nav_comparison = plot_hold_vs_selected_nav(
+        hold_path,
+        portfolio_path,
+        show_selected_gross=portfolio_path.config.policy.is_rebalanced,
     )
-    plt.close(fig)
+    _render_plotly_chart(
+        nav_comparison, key="plot_path_nav", file_stem="portfolio_path_nav"
+    )
 
-    st.markdown("**Asset-level cumulative returns**")
-    fig_assets = plot_asset_cumulative_returns(asset_returns)
-    st.pyplot(fig_assets, use_container_width=True)
-    st.download_button(
-        "⬇️ Download asset cumulative returns (PNG)",
-        data=_fig_to_png_bytes(fig_assets),
-        file_name="asset_cumulative_returns.png",
-        mime="image/png",
-        key="dl_cum_assets",
+    weights_figure = plot_weights_drift_and_rebalances(portfolio_path)
+    _render_plotly_chart(
+        weights_figure, key="plot_path_weights", file_stem="portfolio_path_weights"
     )
-    plt.close(fig_assets)
+
+    turnover_figure = plot_turnover_and_costs(portfolio_path)
+    _render_plotly_chart(
+        turnover_figure,
+        key="plot_path_turnover",
+        file_stem="portfolio_path_turnover_costs",
+    )
+
+    gross_net_figure = plot_gross_vs_net_nav(portfolio_path)
+    _render_plotly_chart(
+        gross_net_figure,
+        key="plot_path_gross_net",
+        file_stem="portfolio_path_gross_net_nav",
+    )
+    st.caption(
+        "The launch allocation is treated as already established, so no initial "
+        "setup cost is charged. Close-price execution is an idealized research mark."
+    )
+
+    fig_assets = plot_asset_cumulative_returns(
+        asset_returns, provenance=results["portfolio_path_provenance"]
+    )
+    _render_plotly_chart(
+        fig_assets,
+        key="plot_asset_cumulative",
+        file_stem="asset_cumulative_returns",
+    )
 
 with tab_dd:
-    st.markdown("**Portfolio drawdown**")
-    fig = plot_drawdown(portfolio_returns)
-    st.pyplot(fig, use_container_width=True)
-    st.download_button(
-        "⬇️ Download drawdown chart (PNG)",
-        data=_fig_to_png_bytes(fig),
-        file_name="drawdown.png",
-        mime="image/png",
-        key="dl_dd_portfolio",
+    drawdown_comparison = plot_comparative_drawdown(hold_path, portfolio_path)
+    _render_plotly_chart(
+        drawdown_comparison,
+        key="plot_path_drawdown",
+        file_stem="portfolio_path_drawdown",
     )
-    plt.close(fig)
 
-    st.markdown("**Asset-level drawdowns**")
     asset_dd = calculate_asset_drawdowns(asset_returns)
-    fig_assets_dd = plot_asset_drawdowns(asset_dd)
-    st.pyplot(fig_assets_dd, use_container_width=True)
-    st.download_button(
-        "⬇️ Download asset drawdowns (PNG)",
-        data=_fig_to_png_bytes(fig_assets_dd),
-        file_name="asset_drawdowns.png",
-        mime="image/png",
-        key="dl_dd_assets",
+    fig_assets_dd = plot_asset_drawdowns(
+        asset_dd, provenance=results["portfolio_path_provenance"]
     )
-    plt.close(fig_assets_dd)
+    _render_plotly_chart(
+        fig_assets_dd,
+        key="plot_asset_drawdowns",
+        file_stem="asset_drawdowns",
+    )
 
 with tab_data:
-    st.markdown("**Prices**")
-    st.dataframe(prices.tail(10), use_container_width=True)
+    path_provenance = results["portfolio_path_provenance"]
+    st.markdown("**Finalized historical prices**")
+    st.dataframe(prices.tail(10), width="stretch")
     st.download_button(
         "⬇️ Download prices.csv",
         data=_df_to_csv_bytes(prices),
         file_name="price_data.csv",
         mime="text/csv",
     )
+    if not provisional_prices.empty:
+        with st.expander("Provisional current/future source rows", expanded=False):
+            st.caption(
+                "Retained for source audit only. These rows are excluded from all "
+                "finalized historical analytics."
+            )
+            st.dataframe(provisional_prices, width="stretch")
+    if not portfolio_path.rebalance_events.empty:
+        with st.expander("Rebalance schedule audit", expanded=False):
+            st.dataframe(portfolio_path.rebalance_events, width="stretch")
 
     st.markdown("**Core asset returns (Simple)**")
-    st.dataframe(asset_returns.tail(10), use_container_width=True)
+    st.dataframe(asset_returns.tail(10), width="stretch")
     st.download_button(
         "⬇️ Download core_asset_returns_simple.csv",
         data=_df_to_csv_bytes(asset_returns),
@@ -1066,19 +1338,56 @@ with tab_data:
     pv_df = pd.DataFrame(
         {"portfolio_return": portfolio_returns, "portfolio_value": portfolio_value}
     )
-    st.dataframe(pv_df.tail(10), use_container_width=True)
+    pv_export = _with_portfolio_path_metadata(pv_df, path_provenance)
+    st.dataframe(pv_df.tail(10), width="stretch")
     st.download_button(
         "⬇️ Download core_portfolio_returns_simple.csv",
-        data=_df_to_csv_bytes(pv_df),
+        data=_df_to_csv_bytes(pv_export),
         file_name="core_portfolio_returns_simple.csv",
         mime="text/csv",
+    )
+
+    st.markdown("**Audited portfolio path**")
+    st.dataframe(portfolio_path.portfolio.tail(20), width="stretch")
+    st.download_button(
+        "⬇️ Download portfolio_path.csv",
+        data=_df_to_csv_bytes(
+            _with_portfolio_path_metadata(portfolio_path.portfolio, path_provenance)
+        ),
+        file_name="portfolio_path.csv",
+        mime="text/csv",
+    )
+    st.download_button(
+        "⬇️ Download portfolio_path_assets.csv",
+        data=_df_to_csv_bytes(
+            _with_portfolio_path_metadata(
+                portfolio_path.assets.reset_index(), path_provenance
+            ),
+            include_index=False,
+        ),
+        file_name="portfolio_path_assets.csv",
+        mime="text/csv",
+    )
+    st.download_button(
+        "⬇️ Download portfolio_path_provenance.json",
+        data=(
+            json.dumps(
+                results["portfolio_path_provenance"],
+                indent=2,
+                sort_keys=True,
+                allow_nan=False,
+            )
+            + "\n"
+        ).encode("utf-8"),
+        file_name="portfolio_path_provenance.json",
+        mime="application/json",
     )
 
     if diagnostic_return_method == "log":
         st.markdown("**Advanced diagnostic returns (Log)**")
         diagnostic_df = diagnostic_asset_returns.copy()
         diagnostic_df["PORTFOLIO"] = diagnostic_portfolio_returns
-        st.dataframe(diagnostic_df.tail(10), use_container_width=True)
+        st.dataframe(diagnostic_df.tail(10), width="stretch")
         st.download_button(
             "⬇️ Download diagnostic_returns_log.csv",
             data=_df_to_csv_bytes(diagnostic_df),
@@ -1115,7 +1424,7 @@ with tab_corr:
 
         corr_matrix = calculate_correlation_matrix(asset_returns, method=corr_method)
         st.markdown("#### Correlation matrix")
-        st.dataframe(corr_matrix, use_container_width=True)
+        st.dataframe(corr_matrix, width="stretch")
 
         # ── Diversification headline metrics ──────────────────────────────
         n_corr = corr_matrix.shape[0]
@@ -1125,14 +1434,15 @@ with tab_corr:
         met1, met2, met3 = st.columns(3)
         met1.metric("Avg pairwise correlation", f"{off_diag_mean:.3f}")
         try:
-            weighted_corr = calculate_weighted_average_correlation(corr_matrix, weights)
+            weighted_corr = calculate_weighted_average_correlation(
+                corr_matrix, current_policy_weights
+            )
             met2.metric(
                 "Portfolio-weighted avg correlation",
                 f"{weighted_corr:.3f}",
                 help=(
                     "Pairwise correlations weighted by the product of the "
-                    "portfolio weights — the correlation your portfolio "
-                    "actually experiences."
+                    "current end-of-path weights under the selected policy."
                 ),
             )
         except ValueError:
@@ -1168,27 +1478,23 @@ with tab_corr:
             met3.metric("Stress-day avg correlation", "N/A")
 
         fig_hm = plot_correlation_heatmap(
-            corr_matrix, title=f"Asset Return Correlation ({corr_method.title()})"
+            corr_matrix,
+            title=f"Historical Asset Return Correlation ({corr_method.title()})",
+            provenance={
+                **results["portfolio_path_provenance"],
+                "correlation_method": corr_method,
+            },
         )
-        st.pyplot(fig_hm, use_container_width=True)
-        cdl1, cdl2 = st.columns(2)
-        with cdl1:
-            st.download_button(
-                "⬇️ Download heatmap (PNG)",
-                data=_fig_to_png_bytes(fig_hm),
-                file_name="correlation_heatmap.png",
-                mime="image/png",
-                key="dl_corr_hm",
-            )
-        with cdl2:
-            st.download_button(
-                "⬇️ Download correlation_matrix.csv",
-                data=_df_to_csv_bytes(corr_matrix),
-                file_name="correlation_matrix.csv",
-                mime="text/csv",
-                key="dl_corr_csv",
-            )
-        plt.close(fig_hm)
+        _render_plotly_chart(
+            fig_hm, key="plot_corr_heatmap", file_stem="correlation_heatmap"
+        )
+        st.download_button(
+            "⬇️ Download correlation_matrix.csv",
+            data=_df_to_csv_bytes(corr_matrix),
+            file_name="correlation_matrix.csv",
+            mime="text/csv",
+            key="dl_corr_csv",
+        )
 
         st.markdown("#### Rolling average pairwise correlation")
         st.caption(
@@ -1199,21 +1505,20 @@ with tab_corr:
         )
         if len(asset_returns.dropna()) >= int(corr_window):
             rolling_corr = calculate_rolling_average_correlation(
-                asset_returns, window=int(corr_window)
+                asset_returns, window=int(corr_window), method=corr_method
             )
             fig_rc = plot_rolling_average_correlation(
                 rolling_corr,
-                title=f"Rolling Average Pairwise Correlation ({corr_window}d window)",
+                title="Rolling Average Pairwise Correlation",
+                method=corr_method,
+                window=int(corr_window),
+                provenance=results["portfolio_path_provenance"],
             )
-            st.pyplot(fig_rc, use_container_width=True)
-            st.download_button(
-                "⬇️ Download rolling correlation (PNG)",
-                data=_fig_to_png_bytes(fig_rc),
-                file_name="rolling_average_correlation.png",
-                mime="image/png",
-                key="dl_corr_roll",
+            _render_plotly_chart(
+                fig_rc,
+                key="plot_rolling_correlation",
+                file_stem="rolling_average_correlation",
             )
-            plt.close(fig_rc)
         else:
             st.info(f"Not enough observations for a {corr_window}-day rolling window.")
 
@@ -1427,7 +1732,7 @@ with tab_assumptions:
     run_assumptions = st.button(
         "🧮 Build assumptions",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         key="run_assumptions",
     )
 
@@ -1517,7 +1822,7 @@ with tab_assumptions:
         ]
         st.dataframe(
             display_table.round(4).reset_index(names="Asset"),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.caption(
@@ -1526,6 +1831,79 @@ with tab_assumptions:
             "between mean and median/trimmed columns flag assets whose "
             "average is driven by a few extreme days."
         )
+
+        view_controls = st.columns(2)
+        with view_controls[0]:
+            view_mode_options = list(EXPECTED_RETURN_VIEW_MODES)
+            estimator_view_mode = st.selectbox(
+                "View mode",
+                view_mode_options,
+                index=view_mode_options.index(DEFAULT_EXPECTED_RETURN_VIEW_MODE),
+                format_func=lambda value: EXPECTED_RETURN_VIEW_MODES[value],
+                key="ra_estimator_view_mode",
+            )
+        with view_controls[1]:
+            comparison_sort = st.selectbox(
+                "Asset order",
+                ["portfolio", "dispersion"],
+                format_func=lambda value: {
+                    "portfolio": "Portfolio asset order",
+                    "dispersion": "Largest estimator dispersion",
+                }[value],
+                key="ra_estimator_sort",
+            )
+
+        comparison_endpoint = "final_expected_return"
+        if estimator_view_mode == "pairwise":
+            comparison_options = [
+                "median",
+                "trimmed_mean",
+                "winsorized_mean",
+                "shrinkage_to_zero",
+            ]
+            if ra_state["table"]["manual_view"].notna().any():
+                comparison_options.append("manual_view")
+            comparison_options.append("final_expected_return")
+            comparison_endpoint = st.selectbox(
+                "Pairwise estimator",
+                comparison_options,
+                index=len(comparison_options) - 1,
+                format_func=lambda value: EXPECTED_RETURN_COMPARISONS[value],
+                key="ra_dumbbell_endpoint",
+            )
+            st.caption(
+                "Raw Historical Mean remains fixed while the selected endpoint "
+                "changes. This is an assumption audit, not a forecast."
+            )
+            dumbbell_figure = build_expected_return_dumbbell(
+                ra_state["table"],
+                ra_cfg,
+                comparison=comparison_endpoint,
+                horizon_days=int(h_used),
+                asset_order=ra_state["assets"],
+                sort_by_dispersion=(comparison_sort == "dispersion"),
+            )
+            chart_file_stem = "historical_mean_pairwise_comparison"
+        else:
+            st.caption(
+                "Each asset row compares the historical location estimators and "
+                "the final value passed downstream. These are model assumptions "
+                "derived from the historical sample, not forecasts."
+            )
+            dumbbell_figure = build_expected_return_estimator_comparison(
+                ra_state["table"],
+                ra_cfg,
+                horizon_days=int(h_used),
+                asset_order=ra_state["assets"],
+                sort_by_dispersion=(comparison_sort == "dispersion"),
+            )
+            chart_file_stem = "all_expected_return_estimators"
+        _render_plotly_chart(
+            dumbbell_figure,
+            key="plot_expected_return_dumbbell",
+            file_stem=chart_file_stem,
+        )
+
         st.download_button(
             "⬇️ Download expected_return_assumptions.csv",
             data=_df_to_csv_bytes(ra_state["table"]),
@@ -1546,7 +1924,7 @@ with tab_assumptions:
         ]
         st.dataframe(
             vol_display.round(2).reset_index(names="Asset"),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         st.caption(
@@ -1609,15 +1987,22 @@ with tab_assumptions:
         cov_col1, cov_col2 = st.columns(2)
         with cov_col1:
             st.markdown("**Covariance matrix (daily)**")
-            st.dataframe((cov_used * 1e4).round(3), use_container_width=True)
+            st.dataframe((cov_used * 1e4).round(3), width="stretch")
             st.caption("Values ×10⁻⁴ for readability.")
         with cov_col2:
             fig_ic = plot_correlation_heatmap(
                 implied_corr,
                 title=f"Implied Correlation — {ra_cfg.covariance_method}",
+                provenance={
+                    **results["portfolio_path_provenance"],
+                    "covariance_method": ra_cfg.covariance_method,
+                },
             )
-            st.pyplot(fig_ic, use_container_width=True)
-            plt.close(fig_ic)
+            _render_plotly_chart(
+                fig_ic,
+                key="plot_implied_correlation",
+                file_stem="implied_correlation",
+            )
         st.download_button(
             "⬇️ Download covariance_assumptions.csv",
             data=_df_to_csv_bytes(cov_used),
@@ -1753,7 +2138,7 @@ with tab_backtest:
     run_backtest = st.button(
         "▶️ Run Backtest",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         key="run_backtest",
     )
 
@@ -1819,6 +2204,10 @@ with tab_backtest:
                         "window": bt_window,
                         "horizon_days": int(bt_horizon),
                         "backtest_mode": bt_mode,
+                        "portfolio_path_provenance": results[
+                            "portfolio_path_provenance"
+                        ],
+                        "portfolio_path_version": PORTFOLIO_PATH_VERSION,
                     }
             else:
                 try:
@@ -1843,6 +2232,10 @@ with tab_backtest:
                         "window": bt_window,
                         "horizon_days": int(bt_horizon),
                         "backtest_mode": bt_mode,
+                        "portfolio_path_provenance": results[
+                            "portfolio_path_provenance"
+                        ],
+                        "portfolio_path_version": PORTFOLIO_PATH_VERSION,
                     }
 
     # ── Render whatever is in session_state (persists across reruns) ─────
@@ -1860,6 +2253,11 @@ with tab_backtest:
             f"**{horizon_used}-day VaR Backtest — confidence "
             f"{confidence_used * 100:.0f}%, window {bt_state['window']} days**"
         )
+        st.caption(
+            _portfolio_path_caption(bt_state["portfolio_path_provenance"])
+            + " Forecasts use the sequential realised policy-return history; "
+            "risk horizon does not alter its rebalance schedule."
+        )
 
         report_table = create_backtesting_report_table(comparison_df)
 
@@ -1875,21 +2273,26 @@ with tab_backtest:
         styled = report_table.style.applymap(
             _color_traffic_light, subset=["Traffic Light"]
         )
-        st.dataframe(styled, use_container_width=True)
+        st.dataframe(styled, width="stretch")
 
-        fig_cmp = plot_model_comparison_backtest(comparison_df)
-        st.pyplot(fig_cmp, use_container_width=True)
-        st.download_button(
-            "⬇️ Download comparison chart (PNG)",
-            data=_fig_to_png_bytes(fig_cmp),
-            file_name="model_comparison_backtest.png",
-            mime="image/png",
+        fig_cmp = plot_model_comparison_backtest(
+            comparison_df,
+            provenance=bt_state["portfolio_path_provenance"],
         )
-        plt.close(fig_cmp)
+        _render_plotly_chart(
+            fig_cmp,
+            key="plot_backtest_model_comparison",
+            file_stem="model_comparison_backtest",
+        )
 
         st.download_button(
             "⬇️ Download model_comparison.csv",
-            data=_df_to_csv_bytes(comparison_df, include_index=False),
+            data=_df_to_csv_bytes(
+                _with_portfolio_path_metadata(
+                    comparison_df, bt_state["portfolio_path_provenance"]
+                ),
+                include_index=False,
+            ),
             file_name="model_comparison.csv",
             mime="text/csv",
         )
@@ -1899,26 +2302,49 @@ with tab_backtest:
             with st.expander(f"📊 {label} detail", expanded=False):
                 if method_name in forecasts_by_method:
                     fc_df = forecasts_by_method[method_name]
-                    fig_a = plot_var_backtest(fc_df, method_name, confidence_used)
-                    st.pyplot(fig_a, use_container_width=True)
-                    plt.close(fig_a)
+                    fig_a = plot_var_backtest(
+                        fc_df,
+                        method_name,
+                        confidence_used,
+                        provenance=bt_state["portfolio_path_provenance"],
+                    )
+                    _render_plotly_chart(
+                        fig_a,
+                        key=f"plot_backtest_{method_name}",
+                        file_stem=f"var_backtest_{method_name}",
+                    )
 
-                    fig_b = plot_breach_timeline(fc_df, method_name)
-                    st.pyplot(fig_b, use_container_width=True)
-                    plt.close(fig_b)
+                    fig_b = plot_breach_timeline(
+                        fc_df,
+                        method_name,
+                        provenance=bt_state["portfolio_path_provenance"],
+                    )
+                    _render_plotly_chart(
+                        fig_b,
+                        key=f"plot_breach_timeline_{method_name}",
+                        file_stem=f"breach_timeline_{method_name}",
+                    )
 
                     rbw_cmp = min(100, max(2, len(fc_df) // 2))
                     fig_rate_cmp = plot_rolling_breach_rate(
                         calculate_rolling_breach_rate(fc_df, window=rbw_cmp),
                         expected_breach_rate=1.0 - confidence_used,
                         method=method_name,
+                        provenance=bt_state["portfolio_path_provenance"],
                     )
-                    st.pyplot(fig_rate_cmp, use_container_width=True)
-                    plt.close(fig_rate_cmp)
+                    _render_plotly_chart(
+                        fig_rate_cmp,
+                        key=f"plot_breach_rate_{method_name}",
+                        file_stem=f"rolling_breach_rate_{method_name}",
+                    )
 
                     st.download_button(
                         f"⬇️ Download var_forecasts_{method_name}.csv",
-                        data=_df_to_csv_bytes(fc_df),
+                        data=_df_to_csv_bytes(
+                            _with_portfolio_path_metadata(
+                                fc_df, bt_state["portfolio_path_provenance"]
+                            )
+                        ),
                         file_name=f"var_forecasts_{method_name}.csv",
                         mime="text/csv",
                         key=f"dl_fc_{method_name}",
@@ -1940,6 +2366,11 @@ with tab_backtest:
             f"{METHOD_LABELS[method_used]}, "
             f"confidence {confidence_used * 100:.0f}%, "
             f"window {bt_state['window']} days**"
+        )
+        st.caption(
+            _portfolio_path_caption(bt_state["portfolio_path_provenance"])
+            + " Forecasts use the sequential realised policy-return history; "
+            "risk horizon does not alter its rebalance schedule."
         )
 
         row1 = st.columns(4)
@@ -1982,28 +2413,31 @@ with tab_backtest:
 
         chart_a, chart_b = st.tabs(["📈 Backtest Chart", "📅 Breach Timeline"])
         with chart_a:
-            fig_a = plot_var_backtest(forecast_df, method_used, confidence_used)
-            st.pyplot(fig_a, use_container_width=True)
-            st.download_button(
-                "⬇️ Download backtest chart (PNG)",
-                data=_fig_to_png_bytes(fig_a),
-                file_name=f"var_backtesting_exceptions_{method_used}.png",
-                mime="image/png",
+            fig_a = plot_var_backtest(
+                forecast_df,
+                method_used,
+                confidence_used,
+                provenance=bt_state["portfolio_path_provenance"],
             )
-            plt.close(fig_a)
+            _render_plotly_chart(
+                fig_a,
+                key="plot_single_backtest",
+                file_stem=f"var_backtesting_exceptions_{method_used}",
+            )
         with chart_b:
-            fig_b = plot_breach_timeline(forecast_df, method_used)
-            st.pyplot(fig_b, use_container_width=True)
-            st.download_button(
-                "⬇️ Download breach timeline (PNG)",
-                data=_fig_to_png_bytes(fig_b),
-                file_name=f"breach_timeline_{method_used}.png",
-                mime="image/png",
+            fig_b = plot_breach_timeline(
+                forecast_df,
+                method_used,
+                provenance=bt_state["portfolio_path_provenance"],
             )
-            plt.close(fig_b)
+            _render_plotly_chart(
+                fig_b,
+                key="plot_single_breach_timeline",
+                file_stem=f"breach_timeline_{method_used}",
+            )
 
         with st.expander("📋 Forecast Data", expanded=False):
-            st.dataframe(forecast_df.tail(50), use_container_width=True)
+            st.dataframe(forecast_df.tail(50), width="stretch")
 
         # ── Rolling breach rate over time ────────────────────────────────
         st.markdown("**📉 Rolling breach rate**")
@@ -2013,14 +2447,18 @@ with tab_backtest:
             rolling_rate,
             expected_breach_rate=result["expected_breach_rate"],
             method=method_used,
+            provenance=bt_state["portfolio_path_provenance"],
         )
-        st.pyplot(fig_rate, use_container_width=True)
-        plt.close(fig_rate)
+        _render_plotly_chart(
+            fig_rate,
+            key="plot_single_breach_rate",
+            file_stem=f"rolling_breach_rate_{method_used}",
+        )
 
         # ── Worst realised horizon losses ────────────────────────────────
         st.markdown("**🔻 Worst realised horizon losses**")
         worst_losses = get_worst_realized_losses(forecast_df, n=10)
-        st.dataframe(worst_losses, use_container_width=True, hide_index=True)
+        st.dataframe(worst_losses, width="stretch", hide_index=True)
         st.download_button(
             "⬇️ Download worst_realised_losses.csv",
             data=_df_to_csv_bytes(worst_losses, include_index=False),
@@ -2035,7 +2473,7 @@ with tab_backtest:
             by_year = summarize_backtest_by_period(
                 forecast_df, confidence_level=confidence_used, freq="Y"
             )
-            st.dataframe(by_year, use_container_width=True, hide_index=True)
+            st.dataframe(by_year, width="stretch", hide_index=True)
         except ValueError as exc:
             st.caption(f"Per-period summary unavailable: {exc}")
 
@@ -2043,17 +2481,22 @@ with tab_backtest:
         with dl_a:
             st.download_button(
                 "⬇️ Download Forecast CSV",
-                data=_df_to_csv_bytes(forecast_df),
+                data=_df_to_csv_bytes(
+                    _with_portfolio_path_metadata(
+                        forecast_df, bt_state["portfolio_path_provenance"]
+                    )
+                ),
                 file_name=f"var_forecasts_{method_used}.csv",
                 mime="text/csv",
             )
         with dl_b:
-            import json  # noqa: PLC0415
-
             result_json = json.dumps(
                 {
-                    k: (None if isinstance(v, float) and pd.isna(v) else v)
-                    for k, v in result.items()
+                    "backtest": {
+                        k: (None if isinstance(v, float) and pd.isna(v) else v)
+                        for k, v in result.items()
+                    },
+                    "portfolio_path_provenance": bt_state["portfolio_path_provenance"],
                 },
                 indent=2,
                 default=str,
@@ -2161,7 +2604,7 @@ with tab_mc:
     run_mc = st.button(
         "▶️ Run Monte Carlo",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         key="run_mc",
     )
 
@@ -2186,8 +2629,12 @@ with tab_mc:
                 float(mc_df),
                 int(mc_seed),
             )
-            normal_pf = calculate_portfolio_scenario_returns(normal_scen, weights)
-            student_pf = calculate_portfolio_scenario_returns(student_scen, weights)
+            normal_pf = calculate_portfolio_scenario_returns(
+                normal_scen, current_policy_weights
+            )
+            student_pf = calculate_portfolio_scenario_returns(
+                student_scen, current_policy_weights
+            )
 
             pf_mean = float(portfolio_returns.mean())
             pf_vol = float(portfolio_returns.std(ddof=1))
@@ -2197,7 +2644,7 @@ with tab_mc:
             paths = simulate_portfolio_paths(
                 portfolio_daily_mean=pf_mean,
                 portfolio_daily_volatility=pf_vol,
-                initial_value=float(initial_capital),
+                initial_value=float(risk_base_value),
                 n_paths=int(mc_n_paths),
                 horizon_days=int(mc_path_horizon),
                 distribution=paths_distribution,
@@ -2209,7 +2656,7 @@ with tab_mc:
             comparison_all = compare_all_risk_methods(
                 portfolio_returns=portfolio_returns,
                 asset_returns=asset_returns,
-                weights=weights,
+                weights=current_policy_weights,
                 confidence_level=float(mc_confidence),
                 horizon_days=int(mc_horizon),
                 n_scenarios=int(mc_n_scenarios),
@@ -2235,6 +2682,12 @@ with tab_mc:
                 "student_pf": student_pf,
                 "paths": paths,
                 "comparison_all": comparison_all,
+                "current_weights": current_policy_weights.copy(),
+                "risk_base_value": risk_base_value,
+                "risk_base_date": str(risk_base_date),
+                "risk_base_type": risk_base_type,
+                "portfolio_path_provenance": results["portfolio_path_provenance"],
+                "portfolio_path_version": PORTFOLIO_PATH_VERSION,
             }
 
     mc_state = st.session_state.get("mc_results")
@@ -2258,8 +2711,14 @@ with tab_mc:
 
         primary_var = scenario_var(pf_selected, mc_conf_used)
         primary_cvar = scenario_cvar(pf_selected, mc_conf_used)
-        money_var = loss_value_to_money(primary_var, initial_capital)
-        money_cvar = loss_value_to_money(primary_cvar, initial_capital)
+        money_var = loss_value_to_money(primary_var, mc_state["risk_base_value"])
+        money_cvar = loss_value_to_money(primary_cvar, mc_state["risk_base_value"])
+
+        st.caption(
+            _portfolio_path_caption(mc_state["portfolio_path_provenance"])
+            + " Scenario aggregation uses the current end-of-path weights; "
+            "simulated value paths start at current net NAV."
+        )
 
         m_row = st.columns(5)
         m_row[0].metric(
@@ -2293,23 +2752,30 @@ with tab_mc:
                 f"{label} MC — {mc_horizon_used}-day Portfolio Return Distribution "
                 f"({mc_state['n_scenarios']:,} scenarios)"
             ),
+            provenance={
+                **mc_state["portfolio_path_provenance"],
+                "confidence_level": mc_conf_used,
+            },
         )
-        st.pyplot(fig_dist, use_container_width=True)
         dist_file_tag = "compare" if dist == "compare" else dist
-        st.download_button(
-            "⬇️ Download MC distribution chart (PNG)",
-            data=_fig_to_png_bytes(fig_dist),
-            file_name=f"mc_loss_distribution_{dist_file_tag}.png",
-            mime="image/png",
-            key="dl_mc_dist",
+        _render_plotly_chart(
+            fig_dist,
+            key="plot_mc_distribution",
+            file_stem=f"mc_loss_distribution_{dist_file_tag}",
         )
-        plt.close(fig_dist)
 
         if dist == "compare":
             st.markdown("### Normal vs Student-t comparison")
-            fig_cmp_dist = plot_normal_vs_student_t_distribution(normal_pf, student_pf)
-            st.pyplot(fig_cmp_dist, use_container_width=True)
-            plt.close(fig_cmp_dist)
+            fig_cmp_dist = plot_normal_vs_student_t_distribution(
+                normal_pf,
+                student_pf,
+                provenance=mc_state["portfolio_path_provenance"],
+            )
+            _render_plotly_chart(
+                fig_cmp_dist,
+                key="plot_mc_distribution_comparison",
+                file_stem="normal_vs_student_t_distribution",
+            )
 
             cmp_rows = []
             for cmp_label, cmp_series in (
@@ -2327,21 +2793,17 @@ with tab_mc:
                         "Best (%)": float(cmp_series.max()) * 100.0,
                     }
                 )
-            st.dataframe(
-                pd.DataFrame(cmp_rows), use_container_width=True, hide_index=True
-            )
+            st.dataframe(pd.DataFrame(cmp_rows), width="stretch", hide_index=True)
 
         st.markdown("### Portfolio value paths")
-        fig_paths = plot_mc_portfolio_paths(paths)
-        st.pyplot(fig_paths, use_container_width=True)
-        st.download_button(
-            "⬇️ Download portfolio paths chart (PNG)",
-            data=_fig_to_png_bytes(fig_paths),
-            file_name="mc_portfolio_paths.png",
-            mime="image/png",
-            key="dl_mc_paths",
+        fig_paths = plot_mc_portfolio_paths(
+            paths, provenance=mc_state["portfolio_path_provenance"]
         )
-        plt.close(fig_paths)
+        _render_plotly_chart(
+            fig_paths,
+            key="plot_mc_paths",
+            file_stem="mc_portfolio_paths",
+        )
 
         st.markdown("### Method comparison (Historical / Gaussian / CF / MC)")
         st.caption(
@@ -2349,8 +2811,8 @@ with tab_mc:
             "basis: Historical / Gaussian / Cornish-Fisher use realised "
             "rolling horizon returns (no √t scaling); the MC rows use "
             "simulated h-day scenarios. These are directly comparable to "
-            "each other, but not to the √t-scaled headline cards at the top "
-            "of the page."
+            "each other. They are scenario analyses, not realized performance "
+            "or forecasts guaranteed to occur."
         )
         styled_cmp = comparison_all.copy()
         styled_cmp["VaR"] = styled_cmp["VaR"].apply(
@@ -2359,22 +2821,26 @@ with tab_mc:
         styled_cmp["CVaR"] = styled_cmp["CVaR"].apply(
             lambda v: f"{v * 100:.2f}%" if pd.notna(v) else "N/A"
         )
-        st.dataframe(styled_cmp, use_container_width=True, hide_index=True)
+        st.dataframe(styled_cmp, width="stretch", hide_index=True)
 
-        fig_cmp = plot_var_cvar_method_comparison(comparison_all)
-        st.pyplot(fig_cmp, use_container_width=True)
-        st.download_button(
-            "⬇️ Download method comparison chart (PNG)",
-            data=_fig_to_png_bytes(fig_cmp),
-            file_name="var_cvar_method_comparison.png",
-            mime="image/png",
-            key="dl_mc_cmp",
+        fig_cmp = plot_var_cvar_method_comparison(
+            comparison_all,
+            provenance=mc_state["portfolio_path_provenance"],
         )
-        plt.close(fig_cmp)
+        _render_plotly_chart(
+            fig_cmp,
+            key="plot_mc_method_comparison",
+            file_stem="var_cvar_method_comparison",
+        )
 
         st.download_button(
             "⬇️ Download model_risk_comparison.csv",
-            data=_df_to_csv_bytes(comparison_all, include_index=False),
+            data=_df_to_csv_bytes(
+                _with_portfolio_path_metadata(
+                    comparison_all, mc_state["portfolio_path_provenance"]
+                ),
+                include_index=False,
+            ),
             file_name="model_risk_comparison.csv",
             mime="text/csv",
             key="dl_mc_cmp_csv",
@@ -2822,7 +3288,7 @@ sweep the cap ±2 % to see how stable the weights are.
     run_opt = st.button(
         "▶️ Run optimization",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         key="run_opt",
     )
 
@@ -2867,7 +3333,7 @@ sweep the cap ±2 % to see how stable the weights are.
             effective_cash_return = (
                 rf_per_horizon if rf_mode != "Zero" else float(opt_cash_return)
             )
-            current_weights_full = weights.copy()
+            current_weights_full = current_policy_weights.copy()
             if opt_include_cash:
                 scenarios = add_cash_asset(
                     scenarios, cash_return=float(effective_cash_return)
@@ -2989,7 +3455,7 @@ sweep the cap ±2 % to see how stable the weights are.
                 current_weights_full,
                 optimized_results,
                 confidence_level=float(opt_confidence),
-                initial_capital=float(initial_capital),
+                initial_capital=float(risk_base_value),
                 risk_free_rate=float(rf_per_horizon),
             )
 
@@ -3060,6 +3526,11 @@ sweep the cap ±2 % to see how stable the weights are.
                 "confidence_level": float(opt_confidence),
                 "include_cash": bool(opt_include_cash),
                 "current_weights": current_weights_full,
+                "risk_base_value": risk_base_value,
+                "risk_base_date": str(risk_base_date),
+                "risk_base_type": risk_base_type,
+                "portfolio_path_provenance": results["portfolio_path_provenance"],
+                "portfolio_path_version": PORTFOLIO_PATH_VERSION,
                 "optimized_results": optimized_results,
                 "comparison": comparison_df,
                 "frontier": frontier_df,
@@ -3100,6 +3571,11 @@ sweep the cap ±2 % to see how stable the weights are.
             f"{len(opt_state['assets'])} assets   ·   "
             f"Confidence {opt_state['confidence_level'] * 100:.1f}%   ·   "
             f"Horizon {opt_state['horizon_days']}d"
+        )
+        st.caption(
+            _portfolio_path_caption(opt_state["portfolio_path_provenance"])
+            + " The 'Current' comparator uses current end-of-path weights; "
+            "optimized portfolios are hypothetical scenario allocations."
         )
 
         opt_results_map = opt_state["optimized_results"]
@@ -3142,9 +3618,7 @@ sweep the cap ±2 % to see how stable the weights are.
                         ),
                     }
                 )
-                st.dataframe(
-                    mu_table.round(4), use_container_width=True, hide_index=True
-                )
+                st.dataframe(mu_table.round(4), width="stretch", hide_index=True)
                 if bool(np.allclose(mu_used.to_numpy(dtype=float), 0.0)):
                     st.warning(
                         "All expected returns are **zero** — return-based "
@@ -3286,7 +3760,7 @@ sweep the cap ±2 % to see how stable the weights are.
                             ]
                             st.dataframe(
                                 pd.DataFrame(residual_rows),
-                                use_container_width=True,
+                                width="stretch",
                                 hide_index=True,
                             )
                             st.caption(
@@ -3301,7 +3775,7 @@ sweep the cap ±2 % to see how stable the weights are.
                     ):
                         st.dataframe(
                             format_weights_table(weights_series),
-                            use_container_width=True,
+                            width="stretch",
                             hide_index=True,
                         )
                     else:
@@ -3338,24 +3812,25 @@ sweep the cap ±2 % to see how stable the weights are.
                 fig_w = plot_optimized_weights(
                     primary["weights"],
                     title=f"{primary_label} — Optimized Weights",
+                    provenance=opt_state["portfolio_path_provenance"],
                 )
-                st.pyplot(fig_w, use_container_width=True)
-                st.download_button(
-                    "⬇️ Download optimized weights chart (PNG)",
-                    data=_fig_to_png_bytes(fig_w),
-                    file_name=(
-                        f"optimized_weights_"
-                        f"{primary_label.lower().replace(' ', '_').replace('(', '').replace(')', '')}.png"
-                    ),
-                    mime="image/png",
-                    key="dl_opt_w",
+                optimized_file_stem = (
+                    f"optimized_weights_"
+                    f"{primary_label.lower().replace(' ', '_').replace('(', '').replace(')', '')}"
                 )
-                plt.close(fig_w)
+                _render_plotly_chart(
+                    fig_w,
+                    key="plot_optimized_weights",
+                    file_stem=optimized_file_stem,
+                )
 
                 st.download_button(
                     "⬇️ Download optimized weights CSV",
                     data=_df_to_csv_bytes(
-                        format_weights_table(primary["weights"]),
+                        _with_portfolio_path_metadata(
+                            format_weights_table(primary["weights"]),
+                            opt_state["portfolio_path_provenance"],
+                        ),
                         include_index=False,
                     ),
                     file_name=(
@@ -3388,25 +3863,29 @@ sweep the cap ±2 % to see how stable the weights are.
             comp_display["Sharpe"] = comp_display["Sharpe"].apply(
                 lambda v: f"{v:.2f}" if pd.notna(v) else "N/A"
             )
-        st.dataframe(comp_display, use_container_width=True, hide_index=True)
+        st.dataframe(comp_display, width="stretch", hide_index=True)
         st.download_button(
             "⬇️ Download portfolio_comparison.csv",
-            data=_df_to_csv_bytes(comparison_df, include_index=False),
+            data=_df_to_csv_bytes(
+                _with_portfolio_path_metadata(
+                    comparison_df, opt_state["portfolio_path_provenance"]
+                ),
+                include_index=False,
+            ),
             file_name="portfolio_comparison.csv",
             mime="text/csv",
             key="dl_opt_cmp_csv",
         )
 
-        fig_cmp = plot_portfolio_comparison(comparison_df)
-        st.pyplot(fig_cmp, use_container_width=True)
-        st.download_button(
-            "⬇️ Download risk comparison chart (PNG)",
-            data=_fig_to_png_bytes(fig_cmp),
-            file_name="current_vs_optimized_risk.png",
-            mime="image/png",
-            key="dl_opt_cmp_png",
+        fig_cmp = plot_portfolio_comparison(
+            comparison_df,
+            provenance=opt_state["portfolio_path_provenance"],
         )
-        plt.close(fig_cmp)
+        _render_plotly_chart(
+            fig_cmp,
+            key="plot_optimizer_comparison",
+            file_stem="current_vs_optimized_risk",
+        )
 
         # ── Allocation comparison ─────────────────────────────────────
         if len(opt_results_map) >= 1:
@@ -3416,35 +3895,38 @@ sweep the cap ±2 % to see how stable the weights are.
                 w = res.get("weights")
                 if isinstance(w, pd.Series) and not w.isna().all():
                     weights_dict[label] = w
-            fig_alloc = plot_allocation_comparison(weights_dict)
-            st.pyplot(fig_alloc, use_container_width=True)
-            st.download_button(
-                "⬇️ Download allocation comparison chart (PNG)",
-                data=_fig_to_png_bytes(fig_alloc),
-                file_name="portfolio_allocation_comparison.png",
-                mime="image/png",
-                key="dl_opt_alloc",
+            fig_alloc = plot_allocation_comparison(
+                weights_dict,
+                provenance=opt_state["portfolio_path_provenance"],
             )
-            plt.close(fig_alloc)
+            _render_plotly_chart(
+                fig_alloc,
+                key="plot_allocation_comparison",
+                file_stem="portfolio_allocation_comparison",
+            )
 
         # ── Efficient frontier ────────────────────────────────────────
         if not frontier_df.empty:
             st.markdown("### CVaR efficient frontier")
-            fig_f = plot_cvar_efficient_frontier(frontier_df)
-            st.pyplot(fig_f, use_container_width=True)
-            st.download_button(
-                "⬇️ Download frontier chart (PNG)",
-                data=_fig_to_png_bytes(fig_f),
-                file_name="cvar_efficient_frontier.png",
-                mime="image/png",
-                key="dl_opt_frontier_png",
+            fig_f = plot_cvar_efficient_frontier(
+                frontier_df,
+                provenance=opt_state["portfolio_path_provenance"],
             )
-            plt.close(fig_f)
+            _render_plotly_chart(
+                fig_f,
+                key="plot_cvar_frontier",
+                file_stem="cvar_efficient_frontier",
+            )
 
-            st.dataframe(frontier_df, use_container_width=True, hide_index=True)
+            st.dataframe(frontier_df, width="stretch", hide_index=True)
             st.download_button(
                 "⬇️ Download cvar_efficient_frontier.csv",
-                data=_df_to_csv_bytes(frontier_df, include_index=False),
+                data=_df_to_csv_bytes(
+                    _with_portfolio_path_metadata(
+                        frontier_df, opt_state["portfolio_path_provenance"]
+                    ),
+                    include_index=False,
+                ),
                 file_name="cvar_efficient_frontier.csv",
                 mime="text/csv",
                 key="dl_opt_frontier_csv",

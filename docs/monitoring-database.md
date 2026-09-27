@@ -74,7 +74,8 @@ idempotent and should not duplicate finalized records.
 The schema stores:
 
 - experiment identities, date boundaries, modes, statuses, and events;
-- one immutable activated optimization snapshot and target allocation;
+- one immutable activated portfolio snapshot and target allocation (manual for
+  new experiments; existing optimized snapshots remain unchanged);
 - normalized price observations and provider provenance;
 - daily portfolio and per-asset states;
 - origin-safe risk forecasts and matured evaluations; and

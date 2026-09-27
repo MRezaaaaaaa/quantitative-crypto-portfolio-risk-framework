@@ -1,5 +1,12 @@
 # Phase 8 Agent Brief — Portfolio Experiment Registry and Forward-Testing Monitor
 
+> User-approved construction update (2026-09-18): new Monitoring experiments
+> MUST use manually entered weights only and MUST NOT invoke optimization.
+> Optimizer-based construction instructions below describe the original Phase 8
+> baseline and are superseded for new creation. Existing saved optimized records
+> remain compatible. See `openspec/specs/portfolio-experiment-monitor/spec.md`
+> and `openspec/changes/update-phase-8-manual-monitoring/` for the current update.
+
 ## Authority and current execution gate
 
 This file is the authoritative implementation brief for Phase 8 of the
@@ -981,7 +988,7 @@ Requirements:
 - updated `uv.lock`;
 - no removal or weakening of existing constraints;
 - no unnecessary dependency additions;
-- existing Matplotlib plots remain supported.
+- Risk Lab and monitoring charts use Plotly figure builders.
 
 No dependency changes are authorized in the current design-only run.
 

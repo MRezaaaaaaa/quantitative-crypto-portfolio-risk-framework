@@ -61,11 +61,31 @@ def test_align_price_data_handles_empty_inputs_and_one_day_gap() -> None:
     assert aligned.iloc[1]["BTC"] == pytest.approx(100.0)
 
 
+def test_clean_price_data_can_preserve_missing_closes_for_path_audit() -> None:
+    prices = pd.DataFrame(
+        {
+            "BTC": [100.0, np.nan, 102.0],
+            "ETH": [50.0, 51.0, 52.0],
+        },
+        index=pd.to_datetime(
+            ["2024-01-03 09:00", "2024-01-02 09:00", "2024-01-01 09:00"]
+        ),
+    )
+
+    cleaned = clean_price_data(prices, preserve_missing=True)
+
+    assert cleaned.index.is_monotonic_increasing
+    assert pd.isna(cleaned.loc[pd.Timestamp("2024-01-02"), "BTC"])
+    assert len(cleaned) == 3
+
+
 @pytest.mark.parametrize(
     ("method", "expected_middle"),
     [("drop", None), ("ffill", 1.0), ("interpolate", 2.0)],
 )
-def test_handle_missing_values_methods(method: str, expected_middle: float | None) -> None:
+def test_handle_missing_values_methods(
+    method: str, expected_middle: float | None
+) -> None:
     prices = pd.DataFrame({"BTC": [1.0, np.nan, 3.0]})
 
     result = handle_missing_values(prices, method)

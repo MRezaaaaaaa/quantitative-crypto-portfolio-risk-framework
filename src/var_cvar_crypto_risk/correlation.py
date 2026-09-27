@@ -46,6 +46,7 @@ def calculate_correlation_matrix(
 def calculate_rolling_average_correlation(
     asset_returns: pd.DataFrame,
     window: int = 90,
+    method: str = "pearson",
 ) -> pd.Series:
     """Average pairwise (off-diagonal) correlation through time.
 
@@ -60,6 +61,8 @@ def calculate_rolling_average_correlation(
         Rows = dates, columns = assets (needs >= 2 assets).
     window : int
         Rolling window length. Must be ``>= 2``.
+    method : {"pearson", "spearman"}
+        Pairwise correlation estimator used in every rolling window.
 
     Returns
     -------
@@ -72,11 +75,13 @@ def calculate_rolling_average_correlation(
     n_assets = asset_returns.shape[1]
     if n_assets < 2:
         raise ValueError(
-            "Rolling average correlation needs at least 2 assets, "
-            f"got {n_assets}."
+            f"Rolling average correlation needs at least 2 assets, got {n_assets}."
         )
     if window < 2:
         raise ValueError(f"window must be >= 2, got {window}.")
+    normalized_method = str(method).strip().lower()
+    if normalized_method not in {"pearson", "spearman"}:
+        raise ValueError("method must be 'pearson' or 'spearman'.")
 
     clean = asset_returns.dropna()
     if len(clean) < window:
@@ -91,14 +96,15 @@ def calculate_rolling_average_correlation(
     out_index: list = []
     for end in range(window, len(clean) + 1):
         block = values[end - window : end]
-        corr = np.corrcoef(block, rowvar=False)
+        if normalized_method == "pearson":
+            corr = np.corrcoef(block, rowvar=False)
+        else:
+            corr = pd.DataFrame(block).corr(method="spearman").to_numpy(dtype=float)
         off_diag_mean = (np.nansum(corr) - np.trace(corr)) / denom
         out_values.append(float(off_diag_mean))
         out_index.append(index[end - 1])
 
-    return pd.Series(
-        out_values, index=out_index, name=f"avg_corr_{window}d"
-    )
+    return pd.Series(out_values, index=out_index, name=f"avg_corr_{window}d")
 
 
 def calculate_weighted_average_correlation(
@@ -169,9 +175,7 @@ def calculate_stress_vs_normal_correlation(
     if not isinstance(portfolio_returns, pd.Series):
         raise ValueError("portfolio_returns must be a pandas Series.")
     if not (0.0 < stress_quantile < 0.5):
-        raise ValueError(
-            f"stress_quantile must be in (0, 0.5), got {stress_quantile}."
-        )
+        raise ValueError(f"stress_quantile must be in (0, 0.5), got {stress_quantile}.")
 
     joined = asset_returns.join(
         portfolio_returns.rename("__portfolio__"), how="inner"

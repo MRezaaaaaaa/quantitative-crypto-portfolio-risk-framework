@@ -40,9 +40,8 @@ from var_cvar_crypto_risk.monitoring.prices import (  # noqa: E402
     normalize_monitoring_prices,
 )
 from var_cvar_crypto_risk.monitoring.recipes import (  # noqa: E402
-    OptimizationRecipe,
+    ManualMonitoringRecipe,
     RiskMonitoringRecipe,
-    ScenarioRecipe,
     SourceRecipe,
 )
 from var_cvar_crypto_risk.monitoring.repository import (  # noqa: E402
@@ -60,57 +59,56 @@ RETRIEVED_AT = datetime(2026, 1, 20, 12, tzinfo=timezone.utc)
 
 
 def _frame(scale: float = 1.0) -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "BTC": [
-                100,
-                101,
-                99,
-                102,
-                101,
-                104,
-                103,
-                105,
-                104,
-                106,
-                107,
-                105,
-                108,
-                109,
-                106,
-                110,
-            ],
-            "ETH": [
-                50,
-                51,
-                50,
-                52,
-                51,
-                53,
-                52,
-                54,
-                53,
-                55,
-                56,
-                54,
-                57,
-                58,
-                55,
-                59,
-            ],
-        },
-        index=pd.date_range("2026-01-01", periods=16, freq="D"),
-        dtype=float,
-    ) * scale
+    return (
+        pd.DataFrame(
+            {
+                "BTC": [
+                    100,
+                    101,
+                    99,
+                    102,
+                    101,
+                    104,
+                    103,
+                    105,
+                    104,
+                    106,
+                    107,
+                    105,
+                    108,
+                    109,
+                    106,
+                    110,
+                ],
+                "ETH": [
+                    50,
+                    51,
+                    50,
+                    52,
+                    51,
+                    53,
+                    52,
+                    54,
+                    53,
+                    55,
+                    56,
+                    54,
+                    57,
+                    58,
+                    55,
+                    59,
+                ],
+            },
+            index=pd.date_range("2026-01-01", periods=16, freq="D"),
+            dtype=float,
+        )
+        * scale
+    )
 
 
-def _recipe() -> OptimizationRecipe:
-    return OptimizationRecipe(
-        scenario=ScenarioRecipe(
-            source="historical",
-            horizon_days=1,
-            random_seed=19,
-        ),
+def _recipe() -> ManualMonitoringRecipe:
+    return ManualMonitoringRecipe(
+        weights={"BTC": 0.60, "ETH": 0.40},
         risk=RiskMonitoringRecipe(
             horizon_days=1,
             estimation_window=4,
@@ -183,9 +181,7 @@ def test_dashboard_reads_persisted_monitoring_records_without_revaluation(
 ) -> None:
     uow_factory, create = dashboard_store
     result = create("dashboard experiment")
-    dashboard = MonitoringReadService(uow_factory).load(
-        result.experiment.experiment_id
-    )
+    dashboard = MonitoringReadService(uow_factory).load(result.experiment.experiment_id)
 
     assert dashboard.experiment.status is ExperimentStatus.COMPLETED
     assert len(dashboard.portfolio) == 6
@@ -196,9 +192,7 @@ def test_dashboard_reads_persisted_monitoring_records_without_revaluation(
     assert complete.groupby("date")["current_weight"].sum().to_numpy() == pytest.approx(
         1.0
     )
-    assert dashboard.risk["input_max_date"].le(
-        dashboard.risk["origin_date"]
-    ).all()
+    assert dashboard.risk["input_max_date"].le(dashboard.risk["origin_date"]).all()
 
     manifest_bytes = _experiment_manifest(dashboard)
     manifest = json.loads(manifest_bytes)
@@ -217,9 +211,7 @@ def test_monitoring_charts_keep_financial_semantics_and_stable_colors(
 ) -> None:
     uow_factory, create = dashboard_store
     result = create("chart experiment")
-    dashboard = MonitoringReadService(uow_factory).load(
-        result.experiment.experiment_id
-    )
+    dashboard = MonitoringReadService(uow_factory).load(result.experiment.experiment_id)
 
     nav = nav_chart(
         dashboard.portfolio,
@@ -291,7 +283,9 @@ def test_comparison_requires_an_explicit_alignment_policy(dashboard_store) -> No
     assert launch_age.nav.iloc[0].to_numpy() == pytest.approx(100.0)
     assert len(calendar.summary) == 2
     assert calendar.summary["observations"].eq(4).all()
-    assert len(comparison_nav_chart(calendar.nav, alignment=calendar.alignment).data) == 2
+    assert (
+        len(comparison_nav_chart(calendar.nav, alignment=calendar.alignment).data) == 2
+    )
     comparison_scatter = comparison_scatter_chart(calendar.summary)
     assert comparison_scatter.data[0].mode == "markers+text"
     with pytest.raises(ValueError, match="explicit"):
@@ -303,19 +297,21 @@ def test_empty_chart_states_do_not_invent_observations() -> None:
     empty_allocation = pd.DataFrame(
         columns=["finalized", "current_weight", "drift_percentage_points"]
     )
-    empty_risk = pd.DataFrame(
-        columns=["realized_loss", "forecast_var", "var_breach"]
-    )
+    empty_risk = pd.DataFrame(columns=["realized_loss", "forecast_var", "var_breach"])
 
-    assert "No finalized NAV" in nav_chart(
-        empty_portfolio, unit="currency"
-    ).layout.annotations[0].text
-    assert "No finalized allocation" in allocation_chart(
-        empty_allocation
-    ).layout.annotations[0].text
-    assert "No evaluated VaR" in breach_timeline_chart(
-        empty_risk
-    ).layout.annotations[0].text
-    assert "Forecast path unavailable" in forecast_realized_chart(
-        empty_risk
-    ).layout.annotations[0].text
+    assert (
+        "No finalized NAV"
+        in nav_chart(empty_portfolio, unit="currency").layout.annotations[0].text
+    )
+    assert (
+        "No finalized allocation"
+        in allocation_chart(empty_allocation).layout.annotations[0].text
+    )
+    assert (
+        "No evaluated VaR"
+        in breach_timeline_chart(empty_risk).layout.annotations[0].text
+    )
+    assert (
+        "Forecast path unavailable"
+        in forecast_realized_chart(empty_risk).layout.annotations[0].text
+    )

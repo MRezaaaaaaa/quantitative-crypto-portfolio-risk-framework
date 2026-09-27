@@ -50,51 +50,53 @@ Live Forward Test, and Hybrid Historical OOS + Live Forward.
 
 For Historical and Hybrid experiments, the system MUST enforce
 `training_start <= training_end <= optimization_as_of < launch_date <=
-historical_evaluation_end`. All expected-return, covariance, scenario, and
-optimizer inputs MUST use observations at or before `optimization_as_of`.
+historical_evaluation_end`. For manual construction these legacy field names
+represent risk history and the allocation decision date. Later evaluation prices
+MUST NOT change the entered allocation or initial quantities. Risk inputs MUST
+end at each forecast origin. A decision date MUST NOT be claimed as proof that
+historical manual weights were selected without hindsight.
 
 #### Scenario: A post-cutoff observation is available in the source frame
 
-- **WHEN** optimization is rebuilt for a historical cutoff from a frame that
+- **WHEN** a manual snapshot is built for a historical cutoff from a frame that
   also contains later observations
-- **THEN** the later observations are excluded from every optimizer input and
+- **THEN** the later evaluation observations are excluded from construction and
   cannot affect the frozen snapshot
 
 #### Scenario: Date boundaries overlap incorrectly
 
 - **WHEN** launch is not after optimization as-of or another required ordering
   is violated
-- **THEN** experiment creation fails before optimization or persistence begins
+- **THEN** experiment creation fails before persistence begins
 
-### Requirement: Historical optimization is rebuilt from its recipe
+### Requirement: Manual portfolio construction does not optimize
 
-The system SHALL rebuild Historical and Hybrid optimization from the frozen
-training slice and serialized optimizer recipe, call the existing optimizer,
-and reject reuse of a current-session optimizer result whose information set is
-not proven to match the cutoff.
+The system SHALL accept explicit long-only weights totaling one for new
+experiments, SHALL NOT normalize weights silently, and SHALL NOT invoke an
+optimizer or reuse Risk Lab results in the creation workflow.
 
 #### Scenario: A current optimizer result includes later market data
 
 - **WHEN** the user creates a historical experiment with a past cutoff
-- **THEN** the system ignores the current result, rebuilds assumptions and
-  scenarios through the cutoff, and records the rebuilt input dates
+- **THEN** the system ignores the current result and uses only explicitly
+  entered manual portfolio weights and declared launch prices
 
-#### Scenario: Independent residual validation fails
+#### Scenario: Manual weights are invalid
 
-- **WHEN** the solver reports success but existing residual governance fails
-- **THEN** no valid optimization snapshot is activated
+- **WHEN** weights are non-finite, duplicated, non-positive or do not sum to one
+- **THEN** no manual portfolio snapshot is activated
 
-### Requirement: Optimization snapshots are immutable after activation
+### Requirement: Portfolio snapshots are immutable after activation
 
-The system SHALL persist one optimization snapshot per experiment containing
-construction, assumptions, constraints, provenance hashes, solver state,
-residual validation, launch forecast, target allocations, and convention
+The system SHALL persist one portfolio snapshot per experiment containing
+manual construction, risk settings, provenance hashes, honest validation state,
+launch prices, target allocations, and convention
 metadata. The snapshot and target allocations MUST become immutable when
 activated.
 
-#### Scenario: A valid solved portfolio is activated
+#### Scenario: A valid manual portfolio is activated
 
-- **WHEN** solver state is accepted and residual validation passes
+- **WHEN** manual weights, prices, values and quantities pass validation
 - **THEN** the system freezes a snapshot UUID, target weights, recipe hash,
   source hash, package/code version, and activation timestamp
 
@@ -104,10 +106,10 @@ activated.
   or target allocation
 - **THEN** the transaction is rejected and the stored snapshot is unchanged
 
-### Requirement: Launch uses the next complete price observation
+### Requirement: Manual launch uses the explicitly selected complete observation
 
-The system SHALL define `optimization_as_of` as the final estimation
-observation, use the next complete valid observation as launch, calculate
+The system SHALL retain `optimization_as_of` as the internal allocation decision
+date, use the explicitly selected complete observation as launch, calculate
 initial quantities at launch prices, set launch-day return to zero, and begin
 performance on the following complete observation.
 
@@ -204,7 +206,7 @@ future evaluation frame into an estimator.
 #### Scenario: A future evaluation price is perturbed
 
 - **WHEN** a price after a forecast origin is changed in a test fixture
-- **THEN** the optimization snapshot and every earlier forecast remain unchanged
+- **THEN** the allocation snapshot and every earlier forecast remain unchanged
 
 #### Scenario: Historical replay completes
 

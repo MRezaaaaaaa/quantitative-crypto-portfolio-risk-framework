@@ -14,7 +14,7 @@ CoinGecko / yfinance / CSV
             ↓
 data_loader.py and preprocessing.py
             ↓
-returns.py and portfolio.py
+returns.py → portfolio_path.py (explicit holdings/trades/costs)
             ↓
 ┌───────────────┬─────────────────┬──────────────────┐
 │ VaR / CVaR    │ Backtesting     │ Monte Carlo      │
@@ -24,7 +24,7 @@ returns.py and portfolio.py
        diagnostics              optimization
             └──────────────┬──────────┘
                            ↓
-                 plotting / exports / UI
+       pure Plotly builders / exports / Streamlit renderer
 ```
 
 ## Persistent monitoring path
@@ -36,7 +36,7 @@ Streamlit monitoring workspace / one-shot CLI
                     ↓
 Experiment creation, historical replay, or live-update service
                     ↓
-Existing assumptions / scenarios / optimization / VaR-CVaR adapters
+Manual weights → solver-free allocation snapshot / VaR-CVaR adapters
                     ↓
 Monitoring domain and fixed-holdings valuation
                     ↓
@@ -67,6 +67,9 @@ the current architecture.
 | `coingecko_client.py`, `yfinance_client.py` | Vendor-specific price retrieval. |
 | `data_loader.py`, `preprocessing.py` | Normalize and validate price data. |
 | `returns.py`, `portfolio.py` | Return conventions, horizon aggregation, weights, and portfolio series. |
+| `portfolio_path.py` | Pure stateful Buy & Hold/rebalanced holdings, close-event timing, transaction costs, accounting checks, and provenance. |
+| `historical_summary.py` | Retrospective path-derived cards/tables and source/calendar quality disclosure; no path reconstruction. |
+| `portfolio_path_charts.py` | Plotly NAV, drift/rebalance, turnover/cost, drawdown, and gross/net path figures without recomputing finance logic. |
 | `return_conventions.py` | Resolve the Automatic/Advanced return policy and calculation boundaries. |
 | `var_models.py`, `cvar_models.py`, `risk_metrics.py` | Core risk measures. |
 | `backtesting.py` | Rolling forecasts, breaches, coverage tests, and reports. |
@@ -75,8 +78,9 @@ the current architecture.
 | `covariance.py` | Covariance validation, numerical diagnostics, and deterministic repair. |
 | `optimization.py` | Scenario construction, CVaR programs, frontier analysis, and diagnostics. |
 | `correlation.py` | Dependence diagnostics. |
-| `plotting.py`, `export.py` | Presentation-neutral figures and generated files. |
+| `plotting.py`, `plotly_theme.py`, `export.py` | Streamlit-independent Plotly figures, shared visual contract, and generated files. |
 | `monitoring/domain.py`, `monitoring/recipes.py` | Experiment lifecycle, fixed recipes, and monitoring contracts. |
+| `monitoring/manual_portfolio.py` | Manual weights to fixed quantities; no optimizer or scenario fitting. |
 | `monitoring/workflows.py`, `historical_replay.py`, `live_update.py` | Point-in-time creation, sequential replay, and bounded live append. |
 | `monitoring/valuation.py`, `risk_forecasts.py` | Fixed-quantity daily states and origin-safe risk evaluation. |
 | `monitoring/repository.py`, `models.py`, `database.py` | Persistence protocols, SQLAlchemy adapter, and transaction setup. |
@@ -122,7 +126,7 @@ Future extraction should use explicit immutable request/configuration objects
 and attach data provenance to each result.
 
 Monitoring results are not stored in session state. Each experiment has a UUID,
-immutable activated optimizer snapshot, database-backed daily records, and
+immutable activated allocation snapshot, database-backed daily records, and
 audited lifecycle events. The monitoring UI consumes persisted read models and
 never treats the current Risk Lab session as an authoritative launch snapshot.
 
@@ -131,6 +135,8 @@ never treats the current Risk Lab session as an authoritative launch snapshot.
 1. Domain modules must not import Streamlit.
 2. Vendor clients must not contain portfolio or risk calculations.
 3. Plotting must consume results rather than recompute them.
+   Every public Risk Lab chart builder returns a Plotly `go.Figure`; Streamlit
+   owns rendering and browser download controls only.
 4. All horizon conversions must be explicit and tested.
 5. Scenario, wealth, and optimization boundaries must reject Log inputs rather
    than silently applying Simple-return arithmetic.
@@ -138,9 +144,11 @@ never treats the current Risk Lab session as an authoritative launch snapshot.
 7. Generated data, caches, and reports must remain outside version control.
 8. Parametric simulation must pass covariance governance, and optimizer success
    must pass independent residual validation before presentation as solved.
-9. Monitoring must rebuild from its declared point-in-time recipe and must not
-   reuse an unproven session-state optimizer result.
+9. New monitoring creation must use explicit manual weights without optimization
+   or session-state optimizer reuse; legacy saved recipes remain compatible.
 10. Finalized daily states and activated snapshots are immutable; archive retains
     history and hard deletion is not exposed.
 11. Streamlit performs at most a bounded update. Repeated updates belong to the
     external one-shot CLI and an operator-controlled scheduler.
+12. Risk horizon and portfolio rebalancing policy are independent inputs. A
+    horizon control MUST NOT create, remove, or move a rebalance event.

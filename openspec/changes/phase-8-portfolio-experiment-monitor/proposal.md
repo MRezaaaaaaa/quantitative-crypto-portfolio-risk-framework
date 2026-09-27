@@ -1,5 +1,10 @@
 # Phase 8 — Portfolio Experiment Registry and Forward-Testing Monitor
 
+> Construction update (2026-09-18): new monitoring portfolios are manual-only.
+> The optimizer-based original proposal below is retained as implementation
+> history and for existing saved records. See the current capability spec and
+> `update-phase-8-manual-monitoring` for the user-approved replacement workflow.
+
 ## Why
 
 The framework can currently produce validated optimizer results, but those

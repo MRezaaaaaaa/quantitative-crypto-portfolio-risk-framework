@@ -90,9 +90,7 @@ def _freeze_string_float_mapping(
     return MappingProxyType(normalized)
 
 
-def _freeze_string_mapping(
-    value: Mapping[str, str], name: str
-) -> Mapping[str, str]:
+def _freeze_string_mapping(value: Mapping[str, str], name: str) -> Mapping[str, str]:
     normalized: dict[str, str] = {}
     for raw_key, raw_value in value.items():
         key = str(raw_key).strip().upper()
@@ -121,9 +119,7 @@ def _assert_secret_free(value: Any, path: str = "metadata") -> None:
     elif isinstance(value, str) and "://" in value:
         parsed = urlsplit(value)
         if parsed.username is not None or parsed.password is not None:
-            raise DomainValidationError(
-                f"{path} contains a credential-bearing URL"
-            )
+            raise DomainValidationError(f"{path} contains a credential-bearing URL")
 
 
 def _plain_mapping(value: Mapping[str, Any]) -> dict[str, Any]:
@@ -299,27 +295,21 @@ class OptimizerRecipe:
     def __post_init__(self) -> None:
         objective = self.objective.strip().lower()
         if objective not in _OBJECTIVES:
-            raise DomainValidationError(f"unsupported optimizer objective {objective!r}")
+            raise DomainValidationError(
+                f"unsupported optimizer objective {objective!r}"
+            )
         minimum = (
-            None
-            if self.min_weight is None
-            else _finite(self.min_weight, "min_weight")
+            None if self.min_weight is None else _finite(self.min_weight, "min_weight")
         )
         maximum = (
-            None
-            if self.max_weight is None
-            else _finite(self.max_weight, "max_weight")
+            None if self.max_weight is None else _finite(self.max_weight, "max_weight")
         )
         if minimum is not None and maximum is not None and minimum > maximum:
             raise DomainValidationError("min_weight must not exceed max_weight")
         cvar_limit = (
-            None
-            if self.cvar_limit is None
-            else _finite(self.cvar_limit, "cvar_limit")
+            None if self.cvar_limit is None else _finite(self.cvar_limit, "cvar_limit")
         )
-        if objective == "max_return_cvar" and (
-            cvar_limit is None or cvar_limit <= 0.0
-        ):
+        if objective == "max_return_cvar" and (cvar_limit is None or cvar_limit <= 0.0):
             raise DomainValidationError(
                 "max_return_cvar requires a positive cvar_limit"
             )
@@ -329,9 +319,7 @@ class OptimizerRecipe:
             else _finite(self.target_return, "target_return")
         )
         if objective == "min_cvar_target_return" and target_return is None:
-            raise DomainValidationError(
-                "min_cvar_target_return requires target_return"
-            )
+            raise DomainValidationError("min_cvar_target_return requires target_return")
         if self.sharpe_grid_points < 2:
             raise DomainValidationError("sharpe_grid_points must be at least two")
         solver = self.solver.strip() if self.solver is not None else None
@@ -558,13 +546,112 @@ def optimization_recipe_from_dict(value: Mapping[str, Any]) -> OptimizationRecip
         ) from exc
 
 
+@dataclass(frozen=True)
+class ManualMonitoringRecipe:
+    """Explicit initial weights and monitoring settings, with no optimizer."""
+
+    weights: Mapping[str, float]
+    risk: RiskMonitoringRecipe = field(default_factory=RiskMonitoringRecipe)
+    cash: CashPolicy = field(default_factory=CashPolicy)
+    source: SourceRecipe = field(
+        default_factory=lambda: SourceRecipe(provider="uploaded_csv")
+    )
+    recipe_version: str = "manual-1"
+
+    def __post_init__(self) -> None:
+        weights = _freeze_string_float_mapping(self.weights, "manual weights")
+        if not weights or any(weight <= 0.0 for weight in weights.values()):
+            raise DomainValidationError(
+                "manual weights must be strictly positive; omit unheld assets"
+            )
+        if not math.isclose(
+            math.fsum(weights.values()), 1.0, rel_tol=0.0, abs_tol=1e-8
+        ):
+            raise DomainValidationError(
+                "manual weights must sum to 100%; no automatic normalization"
+            )
+        if (self.cash.symbol in weights) != self.cash.enabled:
+            raise DomainValidationError(
+                "manual cash weight must match the explicit cash policy"
+            )
+        market_assets = set(weights) - (
+            {self.cash.symbol} if self.cash.enabled else set()
+        )
+        if not market_assets:
+            raise DomainValidationError(
+                "manual monitoring requires at least one market asset"
+            )
+        missing = market_assets - set(self.source.symbol_mapping)
+        if missing:
+            raise DomainValidationError(
+                "source mapping lacks manual assets: " + ", ".join(sorted(missing))
+            )
+        if not self.recipe_version.strip():
+            raise DomainValidationError("recipe_version is required")
+        object.__setattr__(self, "weights", weights)
+
+    @property
+    def market_assets(self) -> tuple[str, ...]:
+        return tuple(
+            asset
+            for asset in self.weights
+            if not (self.cash.enabled and asset == self.cash.symbol)
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "construction_method": "manual",
+            "recipe_version": self.recipe_version,
+            "weights": dict(self.weights),
+            "risk": self.risk.to_dict(),
+            "cash": self.cash.to_dict(),
+            "source": self.source.to_dict(),
+        }
+
+    @property
+    def fingerprint(self) -> str:
+        return sha256_fingerprint(self.to_dict())
+
+
+MonitoringRecipe = ManualMonitoringRecipe | OptimizationRecipe
+
+
+def monitoring_recipe_from_dict(value: Mapping[str, Any]) -> MonitoringRecipe:
+    """Revalidate manual recipes while retaining existing legacy experiments."""
+    if not isinstance(value, Mapping):
+        raise DomainValidationError("persisted monitoring recipe must be a mapping")
+    if value.get("construction_method") != "manual":
+        return optimization_recipe_from_dict(value)
+    if {"optimizer", "assumptions", "scenario"}.intersection(value):
+        raise DomainValidationError(
+            "manual monitoring recipes cannot contain optimization settings"
+        )
+    try:
+        cash_values = dict(value["cash"])
+        cash_values.pop("day_count", None)
+        return ManualMonitoringRecipe(
+            weights=dict(value["weights"]),
+            risk=RiskMonitoringRecipe(**dict(value["risk"])),
+            cash=CashPolicy(**cash_values),
+            source=SourceRecipe(**dict(value["source"])),
+            recipe_version=str(value["recipe_version"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise DomainValidationError(
+            "persisted manual monitoring recipe is incomplete or invalid"
+        ) from exc
+
+
 __all__ = [
     "AssumptionRecipe",
     "CashPolicy",
+    "ManualMonitoringRecipe",
+    "MonitoringRecipe",
     "OptimizationRecipe",
     "OptimizerRecipe",
     "RiskMonitoringRecipe",
     "ScenarioRecipe",
     "SourceRecipe",
     "optimization_recipe_from_dict",
+    "monitoring_recipe_from_dict",
 ]

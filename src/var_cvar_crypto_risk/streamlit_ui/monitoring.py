@@ -49,12 +49,9 @@ from var_cvar_crypto_risk.monitoring.live_update import LiveMonitoringService
 from var_cvar_crypto_risk.monitoring.prices import normalize_monitoring_prices
 from var_cvar_crypto_risk.monitoring.providers import default_provider_registry
 from var_cvar_crypto_risk.monitoring.recipes import (
-    AssumptionRecipe,
     CashPolicy,
-    OptimizationRecipe,
-    OptimizerRecipe,
+    ManualMonitoringRecipe,
     RiskMonitoringRecipe,
-    ScenarioRecipe,
     SourceRecipe,
 )
 from var_cvar_crypto_risk.monitoring.repository import SqlAlchemyUnitOfWork
@@ -81,8 +78,7 @@ def _database_resources(database_url: str):
 def _schema_ready(engine) -> bool:
     inspector = inspect(engine)
     if not (
-        inspector.has_table("experiments")
-        and inspector.has_table("alembic_version")
+        inspector.has_table("experiments") and inspector.has_table("alembic_version")
     ):
         return False
     with engine.connect() as connection:
@@ -122,7 +118,9 @@ def _format_percentage(value) -> str:
 
 
 def _format_money(value, currency: str) -> str:
-    return "N/A" if value is None or pd.isna(value) else f"{currency} {float(value):,.2f}"
+    return (
+        "N/A" if value is None or pd.isna(value) else f"{currency} {float(value):,.2f}"
+    )
 
 
 def _safe_error_message(exc: Exception) -> str:
@@ -135,7 +133,12 @@ def _safe_error_message(exc: Exception) -> str:
 def _experiment_manifest(dashboard) -> bytes:
     experiment = dashboard.experiment
     snapshot = dashboard.snapshot
-    recipe = dict(experiment.source_metadata.get("optimization_recipe", {}))
+    recipe = dict(
+        experiment.source_metadata.get(
+            "monitoring_recipe",
+            experiment.source_metadata.get("optimization_recipe", {}),
+        )
+    )
     experiment_id = str(experiment.experiment_id)
     payload = {
         "experiment_id": experiment_id,
@@ -146,7 +149,11 @@ def _experiment_manifest(dashboard) -> bytes:
         "boundaries": {
             "training_start": experiment.training_start,
             "training_end": experiment.training_end,
-            "optimization_as_of": experiment.optimization_as_of,
+            (
+                "allocation_decision_date"
+                if snapshot and snapshot.objective == "manual"
+                else "optimization_as_of"
+            ): experiment.optimization_as_of,
             "launch_date": experiment.launch_date,
             "historical_evaluation_end": experiment.historical_evaluation_end,
             "live_tracking_end": experiment.live_tracking_end,
@@ -166,9 +173,14 @@ def _experiment_manifest(dashboard) -> bytes:
             else None
         ),
         "methodology": {
-            "assumptions": recipe.get("assumptions"),
-            "scenario": recipe.get("scenario"),
-            "optimizer": recipe.get("optimizer"),
+            **(
+                {"construction_method": "manual", "weights": recipe.get("weights")}
+                if recipe.get("construction_method") == "manual"
+                else {
+                    key: recipe.get(key)
+                    for key in ("assumptions", "scenario", "optimizer")
+                }
+            ),
             "risk": recipe.get("risk"),
             "cash": recipe.get("cash"),
             "source": recipe.get("source"),
@@ -202,7 +214,7 @@ def _render_experiments(read_service, uow_factory) -> None:
     display["latest_nav"] = display["latest_nav"].map(
         lambda value: None if pd.isna(value) else round(float(value), 2)
     )
-    st.dataframe(display, use_container_width=True, hide_index=True)
+    st.dataframe(display, width="stretch", hide_index=True)
 
     values, labels = _experiment_options(frame)
     selected = st.selectbox(
@@ -232,18 +244,45 @@ def _parse_symbol_mapping(raw: str) -> dict[str, str]:
         raise DomainValidationError("Symbol mapping must be valid JSON") from exc
     if not isinstance(parsed, dict) or not parsed:
         raise DomainValidationError("Symbol mapping must be a non-empty JSON object")
-    return {str(key).strip().upper(): str(value).strip() for key, value in parsed.items()}
+    return {
+        str(key).strip().upper(): str(value).strip() for key, value in parsed.items()
+    }
 
 
 def _uploaded_prices(uploaded, *, source: str):
     if uploaded is None:
         raise DomainValidationError("Upload a wide daily price CSV")
     frame = pd.read_csv(uploaded)
-    date_columns = [column for column in frame.columns if str(column).strip().lower() == "date"]
+    date_columns = [
+        column for column in frame.columns if str(column).strip().lower() == "date"
+    ]
     if len(date_columns) != 1:
         raise DomainValidationError("CSV requires exactly one Date column")
     frame = frame.set_index(date_columns[0])
     return normalize_monitoring_prices(frame, source=source)
+
+
+def _parse_manual_weights(table: pd.DataFrame) -> dict[str, float]:
+    """Translate explicitly entered percentages, rejecting duplicate rows."""
+    weights: dict[str, float] = {}
+    for _, row in table.iterrows():
+        raw_symbol, percentage = row.get("Symbol"), row.get("Weight (%)")
+        if pd.isna(raw_symbol) and pd.isna(percentage):
+            continue
+        symbol = "" if pd.isna(raw_symbol) else str(raw_symbol).strip().upper()
+        if not symbol or pd.isna(percentage):
+            raise DomainValidationError(
+                "Every portfolio row needs a symbol and weight percentage"
+            )
+        if symbol in weights:
+            raise DomainValidationError(f"Duplicate manual portfolio symbol: {symbol}")
+        try:
+            weights[symbol] = float(percentage) / 100.0
+        except (TypeError, ValueError) as exc:
+            raise DomainValidationError(
+                "Manual weight percentages must be numeric"
+            ) from exc
+    return weights
 
 
 def _render_methodology_preview(
@@ -255,17 +294,16 @@ def _render_methodology_preview(
     launch_date: date,
     horizon: int,
     confidence: float,
-    covariance_method: str,
-    expected_return_method: str,
 ) -> None:
     with st.expander("Methodology preview and point-in-time gate", expanded=True):
         st.markdown(
             f"""
 - **Label:** {MODE_LABELS[mode]}
-- **Information set:** training prices from `{training_start}` through `{optimization_as_of}` only
-- **Launch:** first explicitly requested complete close on `{launch_date}`; launch return is zero
+- **Construction:** user-entered manual weights; no optimizer, scenarios or fitted expected returns
+- **Declared pre-launch risk history:** `{training_start}` through `{optimization_as_of}`; each daily risk forecast uses prices only through its own origin
+- **Declared allocation decision date:** `{optimization_as_of}` (not proof of historical knowledge)
+- **Launch:** explicitly selected complete daily close on `{launch_date}`; no date shift and launch return is zero
 - **Source:** `{source}` with frozen symbol mapping
-- **Expected return / covariance:** `{expected_return_method}` / `{covariance_method}`
 - **Risk horizon / confidence:** `{horizon}` calendar day(s) / `{confidence:.1%}`
 - **Post-launch policy:** fixed quantities, Simple-return wealth arithmetic, no re-optimization or rebalancing
 """
@@ -273,19 +311,23 @@ def _render_methodology_preview(
         st.warning(
             "Replay and forward monitoring omit fees, slippage, liquidity, taxes, "
             "custody, and rebalancing. Results are conditional research evidence, "
-            "not a performance guarantee or complete model validation."
+            "not a performance guarantee or complete model validation. Manual historical "
+            "weights may have been selected with hindsight; backdating a decision date "
+            "does not establish a genuine ex-ante allocation."
         )
 
 
 def _render_create(uow_factory) -> None:
     st.subheader("Create Forward Test")
     st.caption(
-        "Historical modes rebuild from the frozen cutoff. Current Risk Lab optimizer "
-        "session results are never reused."
+        "Enter the portfolio you want to monitor. No optimization is performed. "
+        "Risk Lab weights are not imported or changed automatically."
     )
     today = date.today()
     name = st.text_input("Experiment name", value="BTC-ETH fixed-holdings experiment")
-    description = st.text_area("Description", value="Research-only portfolio monitoring experiment.")
+    description = st.text_area(
+        "Description", value="Research-only portfolio monitoring experiment."
+    )
     mode_label = st.selectbox("Experiment mode", list(MODE_BY_LABEL))
     mode = MODE_BY_LABEL[mode_label]
     source_label = st.selectbox(
@@ -298,7 +340,9 @@ def _render_create(uow_factory) -> None:
         "Uploaded daily price CSV": "uploaded_csv",
     }[source_label]
     if source == "uploaded_csv" and mode is not ExperimentMode.HISTORICAL_OOS:
-        st.error("Uploaded files are not refreshable and cannot create Live Forward or Hybrid experiments.")
+        st.error(
+            "Uploaded files are not refreshable and cannot create Live Forward or Hybrid experiments."
+        )
     uploaded = (
         st.file_uploader("Wide CSV: Date,BTC,ETH,...", type=["csv"])
         if source == "uploaded_csv"
@@ -314,44 +358,83 @@ def _render_create(uow_factory) -> None:
         value=default_mapping,
         help="Keys are project symbols; values are provider coin IDs or tickers.",
     )
-    benchmark = st.text_input("Benchmark symbol (must be present in the data)", value="BTC").strip().upper()
+    benchmark = (
+        st.text_input("Benchmark symbol (must be present in the data)", value="BTC")
+        .strip()
+        .upper()
+    )
 
-    date_cols = st.columns(4)
-    training_start = date_cols[0].date_input("Training start", value=today - timedelta(days=410))
-    training_end = date_cols[1].date_input("Training end", value=today - timedelta(days=10))
-    optimization_as_of = date_cols[2].date_input("Optimization as-of", value=today - timedelta(days=10))
-    launch_date = date_cols[3].date_input("Launch date", value=today - timedelta(days=9))
+    st.markdown("### Manual portfolio")
+    st.caption(
+        "Enter initial weights in percent. Total must be exactly 100%. Add a CASH row only if you hold cash. No automatic normalization or allocation selection."
+    )
+    portfolio_table = st.data_editor(
+        pd.DataFrame({"Symbol": ["BTC", "ETH"], "Weight (%)": [50.0, 50.0]}),
+        num_rows="dynamic",
+        hide_index=True,
+        width="stretch",
+        key="monitor_manual_portfolio",
+        column_config={
+            "Weight (%)": st.column_config.NumberColumn(
+                "Weight (%)", min_value=0.0, max_value=100.0, step=0.1
+            )
+        },
+    )
+    st.caption(
+        f"Entered total: {pd.to_numeric(portfolio_table['Weight (%)'], errors='coerce').sum():.2f}%"
+    )
+    cash_enabled = bool(
+        portfolio_table["Symbol"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.upper()
+        .eq("CASH")
+        .any()
+    )
+    cash_rate = (
+        st.number_input(
+            "Cash annual rate", min_value=-0.99, max_value=1.0, value=0.0, step=0.005
+        )
+        if cash_enabled
+        else 0.0
+    )
+
+    date_cols = st.columns(3)
+    training_start = date_cols[0].date_input(
+        "Risk history start", value=today - timedelta(days=410)
+    )
+    optimization_as_of = date_cols[1].date_input(
+        "Allocation decision / risk-history cutoff", value=today - timedelta(days=10)
+    )
+    training_end = optimization_as_of
+    launch_date = date_cols[2].date_input(
+        "Launch date", value=today - timedelta(days=9)
+    )
     historical_end = None
     if mode in {ExperimentMode.HISTORICAL_OOS, ExperimentMode.HYBRID}:
-        historical_end = st.date_input("Historical OOS evaluation end", value=today - timedelta(days=1))
+        historical_end = st.date_input(
+            "Historical OOS evaluation end", value=today - timedelta(days=1)
+        )
     track_to_date = st.checkbox("Set a finite live tracking end", value=False)
     live_end = (
         st.date_input("Live tracking end", value=today + timedelta(days=60))
-        if track_to_date and mode in {ExperimentMode.LIVE_FORWARD, ExperimentMode.HYBRID}
+        if track_to_date
+        and mode in {ExperimentMode.LIVE_FORWARD, ExperimentMode.HYBRID}
         else None
     )
 
     settings = st.columns(4)
-    initial_capital = settings[0].number_input("Initial capital", min_value=1.0, value=100_000.0)
-    horizon = settings[1].number_input("Risk horizon (calendar days)", min_value=1, max_value=30, value=1)
+    initial_capital = settings[0].number_input(
+        "Initial capital", min_value=1.0, value=100_000.0
+    )
+    horizon = settings[1].number_input(
+        "Risk horizon (calendar days)", min_value=1, max_value=30, value=1
+    )
     confidence = settings[2].selectbox("Confidence", [0.90, 0.95, 0.975, 0.99], index=1)
-    estimation_window = settings[3].number_input("Risk estimation window", min_value=30, max_value=2000, value=252)
-    assumption_cols = st.columns(4)
-    expected_method = assumption_cols[0].selectbox(
-        "Expected-return estimator", ["mean", "median", "trimmed", "winsorized", "shrinkage", "zero"]
+    estimation_window = settings[3].number_input(
+        "Risk estimation window", min_value=30, max_value=2000, value=252
     )
-    covariance_method = assumption_cols[1].selectbox("Covariance estimator", ["sample", "shrinkage", "ewma"])
-    scenario_source = assumption_cols[2].selectbox(
-        "Scenario source", ["historical", "normal_mc", "student_t_mc"]
-    )
-    objective = assumption_cols[3].selectbox("Optimizer objective", ["min_cvar", "max_sharpe"])
-    cash_enabled = st.checkbox("Include explicit cash asset", value=False)
-    cash_rate = (
-        st.number_input("Cash annual rate", min_value=-0.99, max_value=1.0, value=0.0, step=0.005)
-        if cash_enabled
-        else 0.0
-    )
-    max_weight = st.slider("Maximum weight per asset", min_value=0.05, max_value=1.0, value=1.0, step=0.05)
 
     _render_methodology_preview(
         mode=mode,
@@ -361,11 +444,13 @@ def _render_create(uow_factory) -> None:
         launch_date=launch_date,
         horizon=int(horizon),
         confidence=float(confidence),
-        covariance_method=covariance_method,
-        expected_return_method=expected_method,
     )
-    invalid_source = source == "uploaded_csv" and mode is not ExperimentMode.HISTORICAL_OOS
-    if not st.button("Validate, rebuild, and create experiment", type="primary", disabled=invalid_source):
+    invalid_source = (
+        source == "uploaded_csv" and mode is not ExperimentMode.HISTORICAL_OOS
+    )
+    if not st.button(
+        "Validate and create manual portfolio", type="primary", disabled=invalid_source
+    ):
         return
 
     try:
@@ -375,24 +460,8 @@ def _render_create(uow_factory) -> None:
             symbol_mapping=mapping,
             refreshable=source != "uploaded_csv",
         )
-        recipe = OptimizationRecipe(
-            assumptions=AssumptionRecipe(
-                expected_return_method=expected_method,
-                covariance_method=covariance_method,
-            ),
-            scenario=ScenarioRecipe(
-                source=scenario_source,
-                horizon_days=int(horizon),
-                n_scenarios=5_000,
-                random_seed=42,
-            ),
-            optimizer=OptimizerRecipe(
-                objective=objective,
-                confidence_level=float(confidence),
-                long_only=True,
-                max_weight=float(max_weight),
-                risk_free_rate=float(cash_rate),
-            ),
+        recipe = ManualMonitoringRecipe(
+            weights=_parse_manual_weights(portfolio_table),
             risk=RiskMonitoringRecipe(
                 var_method="historical",
                 cvar_method="historical",
@@ -403,16 +472,12 @@ def _render_create(uow_factory) -> None:
             ),
             cash=CashPolicy(
                 enabled=cash_enabled,
-                mode=(
-                    "annual_rate"
-                    if cash_enabled and cash_rate != 0.0
-                    else "zero"
-                ),
+                mode=("annual_rate" if cash_enabled and cash_rate != 0.0 else "zero"),
                 annual_rate=float(cash_rate),
             ),
             source=source_recipe,
         )
-        universe = tuple(mapping)
+        universe = recipe.market_assets
         if source == "uploaded_csv":
             normalized = _uploaded_prices(uploaded, source=source)
         else:
@@ -460,17 +525,19 @@ def _render_create(uow_factory) -> None:
     except Exception as exc:
         st.error(f"Experiment was not initialized: {_safe_error_message(exc)}")
         return
-    st.session_state["monitor_selected_experiment"] = str(result.experiment.experiment_id)
+    st.session_state["monitor_selected_experiment"] = str(
+        result.experiment.experiment_id
+    )
     st.success(
         f"Created {result.experiment.name} with ID {result.experiment.experiment_id}. "
-        "The optimization snapshot and methodology are frozen."
+        "Your manual weights, fixed quantities and monitoring methodology are frozen. No optimization was performed."
     )
 
 
 def _render_snapshot(dashboard) -> None:
     snapshot = dashboard.snapshot
     if snapshot is None:
-        st.warning("This draft has no activated optimization snapshot.")
+        st.warning("This draft has no activated portfolio snapshot.")
         return
     st.dataframe(
         pd.DataFrame(
@@ -487,12 +554,15 @@ def _render_snapshot(dashboard) -> None:
                 for item in snapshot.allocations
             ]
         ),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
     st.caption(
         f"Snapshot `{snapshot.snapshot_id}` · recipe `{snapshot.assumption_recipe_hash}` · "
         f"source `{snapshot.source_data_hash}`"
+    )
+    st.caption(
+        f"Construction: {'Manual weights (no optimization)' if snapshot.objective == 'manual' else 'Legacy optimized portfolio'}"
     )
 
 
@@ -509,15 +579,29 @@ def _render_monitor(read_service) -> None:
         f"status `{experiment.status.value}`"
     )
     cards = st.columns(6)
-    cards[0].metric("Latest NAV", _format_money(dashboard.kpis["nav"], experiment.base_currency))
-    cards[1].metric("Cumulative return", _format_percentage(dashboard.kpis["cumulative_return"]))
-    cards[2].metric("Realized volatility", _format_percentage(dashboard.kpis["realized_volatility"]))
-    cards[3].metric("Maximum drawdown", _format_percentage(dashboard.kpis["maximum_drawdown"]))
+    cards[0].metric(
+        "Latest NAV", _format_money(dashboard.kpis["nav"], experiment.base_currency)
+    )
+    cards[1].metric(
+        "Cumulative return", _format_percentage(dashboard.kpis["cumulative_return"])
+    )
+    cards[2].metric(
+        "Realized volatility", _format_percentage(dashboard.kpis["realized_volatility"])
+    )
+    cards[3].metric(
+        "Maximum drawdown", _format_percentage(dashboard.kpis["maximum_drawdown"])
+    )
     cards[4].metric("Total drift", _format_percentage(dashboard.kpis["total_drift"]))
     cards[5].metric("VaR exceptions", str(dashboard.kpis["var_breaches"]))
 
     overview, allocation_tab, risk_tab, forecast_tab, provenance = st.tabs(
-        ["Overview", "Allocation & Drift", "Risk & Breaches", "Forecast vs Realized", "Snapshot & Provenance"]
+        [
+            "Overview",
+            "Allocation & Drift",
+            "Risk & Breaches",
+            "Forecast vs Realized",
+            "Snapshot & Provenance",
+        ]
     )
     with overview:
         unit = st.radio("NAV display", ["currency", "base_100"], horizontal=True)
@@ -531,7 +615,7 @@ def _render_monitor(read_service) -> None:
                     else None
                 ),
             ),
-            use_container_width=True,
+            width="stretch",
         )
         st.plotly_chart(
             drawdown_chart(
@@ -542,10 +626,12 @@ def _render_monitor(read_service) -> None:
                     else None
                 ),
             ),
-            use_container_width=True,
+            width="stretch",
         )
     with allocation_tab:
-        st.info("Weights drift because quantities are fixed. This view does not recommend rebalancing.")
+        st.info(
+            "Weights drift because quantities are fixed. This view does not recommend rebalancing."
+        )
         st.plotly_chart(
             allocation_chart(
                 dashboard.allocation,
@@ -555,31 +641,41 @@ def _render_monitor(read_service) -> None:
                     else None
                 ),
             ),
-            use_container_width=True,
+            width="stretch",
         )
-        st.plotly_chart(target_current_chart(dashboard.allocation), use_container_width=True)
-        st.plotly_chart(drift_chart(dashboard.allocation, dashboard.portfolio), use_container_width=True)
+        st.plotly_chart(target_current_chart(dashboard.allocation), width="stretch")
+        st.plotly_chart(
+            drift_chart(dashboard.allocation, dashboard.portfolio), width="stretch"
+        )
     with risk_tab:
-        st.warning("A VaR exception is realized loss > VaR. CVaR/Expected Shortfall is not an exception threshold.")
-        st.plotly_chart(risk_history_chart(dashboard.risk), use_container_width=True)
-        st.plotly_chart(breach_timeline_chart(dashboard.risk), use_container_width=True)
-        st.dataframe(dashboard.risk, use_container_width=True, hide_index=True)
+        st.warning(
+            "A VaR exception is realized loss > VaR. CVaR/Expected Shortfall is not an exception threshold."
+        )
+        st.plotly_chart(risk_history_chart(dashboard.risk), width="stretch")
+        st.plotly_chart(breach_timeline_chart(dashboard.risk), width="stretch")
+        st.dataframe(dashboard.risk, width="stretch", hide_index=True)
     with forecast_tab:
-        st.plotly_chart(forecast_realized_chart(dashboard.risk), use_container_width=True)
-        st.caption("Forecast path unavailable unless genuine frozen path percentiles were persisted; no fan is synthesized.")
+        st.plotly_chart(forecast_realized_chart(dashboard.risk), width="stretch")
+        st.caption(
+            "Forecast path unavailable unless genuine frozen path percentiles were persisted; no fan is synthesized."
+        )
     with provenance:
         _render_snapshot(dashboard)
         st.json(
             {
                 "training_start": experiment.training_start,
                 "training_end": experiment.training_end,
-                "optimization_as_of": experiment.optimization_as_of,
+                (
+                    "allocation_decision_date"
+                    if dashboard.snapshot and dashboard.snapshot.objective == "manual"
+                    else "optimization_as_of"
+                ): experiment.optimization_as_of,
                 "launch_date": experiment.launch_date,
                 "historical_evaluation_end": experiment.historical_evaluation_end,
                 "live_tracking_end": experiment.live_tracking_end,
             }
         )
-        st.dataframe(dashboard.events, use_container_width=True, hide_index=True)
+        st.dataframe(dashboard.events, width="stretch", hide_index=True)
 
     st.markdown("### Downloads")
     downloads = st.columns(4)
@@ -649,10 +745,10 @@ def _render_comparison(read_service) -> None:
     )
     st.plotly_chart(
         comparison_nav_chart(comparison.nav, alignment=alignment),
-        use_container_width=True,
+        width="stretch",
     )
-    st.plotly_chart(comparison_scatter_chart(comparison.summary), use_container_width=True)
-    st.dataframe(comparison.summary, use_container_width=True, hide_index=True)
+    st.plotly_chart(comparison_scatter_chart(comparison.summary), width="stretch")
+    st.dataframe(comparison.summary, width="stretch", hide_index=True)
 
 
 def _render_quality(read_service, uow_factory) -> None:
@@ -662,7 +758,11 @@ def _render_quality(read_service, uow_factory) -> None:
         return
     dashboard = read_service.load(experiment_id)
     experiment = dashboard.experiment
-    complete = int((dashboard.quality["status"] == "complete").sum()) if not dashboard.quality.empty else 0
+    complete = (
+        int((dashboard.quality["status"] == "complete").sum())
+        if not dashboard.quality.empty
+        else 0
+    )
     incomplete = len(dashboard.quality) - complete
     cards = st.columns(4)
     cards[0].metric("Complete dates", complete)
@@ -674,17 +774,21 @@ def _render_quality(read_service, uow_factory) -> None:
         else "N/A"
     )
     cards[3].metric("Latest actual source", latest_source)
-    st.dataframe(dashboard.quality, use_container_width=True, hide_index=True)
-    st.dataframe(dashboard.runs, use_container_width=True, hide_index=True)
+    st.dataframe(dashboard.quality, width="stretch", hide_index=True)
+    st.dataframe(dashboard.runs, width="stretch", hide_index=True)
 
-    can_update = (
-        experiment.status is ExperimentStatus.ACTIVE
-        and experiment.mode in {ExperimentMode.LIVE_FORWARD, ExperimentMode.HYBRID}
-    )
+    can_update = experiment.status is ExperimentStatus.ACTIVE and experiment.mode in {
+        ExperimentMode.LIVE_FORWARD,
+        ExperimentMode.HYBRID,
+    }
     if not can_update:
-        st.caption("Update Now is available only for active Live Forward or Hybrid experiments.")
+        st.caption(
+            "Update Now is available only for active Live Forward or Hybrid experiments."
+        )
         return
-    st.warning("Update Now performs one bounded provider refresh. Streamlit does not run a scheduler or background loop.")
+    st.warning(
+        "Update Now performs one bounded provider refresh. Streamlit does not run a scheduler or background loop."
+    )
     if st.button("Update Now", type="primary"):
         try:
             result = LiveMonitoringService(
@@ -728,7 +832,13 @@ def render_monitoring_workspace(project_root: str | Path | None = None) -> None:
     read_service = MonitoringReadService(uow_factory)
     page = st.radio(
         "Monitoring view",
-        ["Experiments", "Create Forward Test", "Portfolio Monitor", "Comparison", "Data Quality"],
+        [
+            "Experiments",
+            "Create Forward Test",
+            "Portfolio Monitor",
+            "Comparison",
+            "Data Quality",
+        ],
         horizontal=True,
         key="monitoring_view",
     )

@@ -16,6 +16,20 @@ fixture. It demonstrates the workflow only. Its results must not be described
 as evidence about actual crypto performance, forecasting accuracy, or an
 investable strategy.
 
+Publication Risk Summary is built from an explicit Portfolio Path V1 policy,
+not from the legacy constant-weight summary helper. The demo config declares
+`buy_and_hold`, zero commission, and zero slippage. A schema-v1 publication
+config that predates these fields defaults to the same policy and costs, and the
+manifest records that compatibility default. Later schemas must declare the
+policy explicitly.
+
+`risk_summary.csv` uses the same long-form summary contract as Streamlit:
+`Record Type`, `Section`, `Name`, `Value`, `Display Value`, `Unit`, and
+`Sample Size`. It excludes annualized return, annualized volatility, Sharpe,
+and duplicate drawdown calculations. The manifest records policy, costs,
+methodology version, and data cutoff so the result is not mistaken for a generic
+portfolio history.
+
 ## Generate a candidate artifact bundle
 
 Start from a clean reviewed commit:

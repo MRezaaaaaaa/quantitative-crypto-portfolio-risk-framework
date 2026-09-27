@@ -17,7 +17,7 @@ from .domain import (
     RecordNotFoundError,
     validate_date_boundaries,
 )
-from .recipes import OptimizationRecipe
+from .recipes import ManualMonitoringRecipe, MonitoringRecipe
 from .repository import PersistenceCounts, UnitOfWork
 from .hashing import sha256_fingerprint
 
@@ -75,7 +75,7 @@ class ExperimentRegistry:
         mode: ExperimentMode,
         base_currency: str,
         initial_capital: float,
-        recipe: OptimizationRecipe,
+        recipe: MonitoringRecipe,
         training_start: date,
         training_end: date,
         optimization_as_of: date,
@@ -119,7 +119,11 @@ class ExperimentRegistry:
             source_metadata={
                 "source": recipe.source.to_dict(),
                 "recipe_fingerprint": recipe.fingerprint,
-                "optimization_recipe": recipe.to_dict(),
+                (
+                    "monitoring_recipe"
+                    if isinstance(recipe, ManualMonitoringRecipe)
+                    else "optimization_recipe"
+                ): recipe.to_dict(),
             },
         )
         with self._uow_factory() as uow:
@@ -150,9 +154,7 @@ class ExperimentRegistry:
             uow.commit()
             return experiment
 
-    def archive(
-        self, experiment_id: UUID, *, at: datetime | None = None
-    ) -> Experiment:
+    def archive(self, experiment_id: UUID, *, at: datetime | None = None) -> Experiment:
         with self._uow_factory() as uow:
             experiment = uow.experiments.archive(experiment_id, at=at)
             uow.commit()
@@ -162,7 +164,7 @@ class ExperimentRegistry:
         """Persist one already-validated immutable snapshot idempotently."""
         if snapshot.activated_at is None:
             raise DomainValidationError(
-                "registry accepts only validated activated optimization snapshots"
+                "registry accepts only validated activated portfolio snapshots"
             )
         with self._uow_factory() as uow:
             existing = uow.snapshots.get_for_experiment(snapshot.experiment_id)
@@ -203,7 +205,9 @@ class MonitoringPersistenceService:
                 elif outcome == "skipped":
                     state_skipped += 1
                 else:  # pragma: no cover - adapter contract guard
-                    raise RuntimeError(f"unknown valuation persistence outcome {outcome}")
+                    raise RuntimeError(
+                        f"unknown valuation persistence outcome {outcome}"
+                    )
             uow.commit()
         return {
             "prices": price_counts,

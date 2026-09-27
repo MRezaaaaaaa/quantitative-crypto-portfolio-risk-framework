@@ -19,6 +19,94 @@ select Log returns for distribution diagnostics only. Portfolio diagnostic Log
 returns are derived exactly from reconstructed asset gross returns, not from a
 weighted average of asset Log returns. See [Return conventions](return-conventions.md).
 
+## Retrospective Risk Summary
+
+Risk Summary answers only what happened historically under the selected
+portfolio-evolution policy. Ending net NAV, net cumulative return, maximum
+drawdown and transaction costs come from the finalized Portfolio Path V1 net
+history. Maximum drawdown includes initial capital as the launch peak. The page
+does not rebuild a constant-weight return series and does not present sample
+statistics as forecasts.
+
+Before the path is built, a source row dated on the current UTC calendar day is
+classified as provisional. It remains available for audit but is excluded from
+finalized NAV, returns, drawdown, tail observations, and sample counts. The same
+rule applies to later-dated source rows. If fewer than two finalized observations
+remain, analysis stops with an explicit insufficient-history error; the engine
+does not substitute the provisional mark.
+
+Mean, volatility, minimum and maximum are labeled daily only when every included
+finalized return spans exactly one calendar day and source-quality checks permit
+that label. Missing prices, calendar gaps, source duplicate/order defects and
+excluded provisional rows are disclosed. Missing finalized observations are not
+silently forward-filled or removed from cumulative NAV merely to make daily
+statistics available. Skewness and excess kurtosis are secondary descriptive
+moments and show `N/A` when the daily sample is invalid or insufficient.
+
+The separate Historical Tail Distribution retains the existing VaR/CVaR models.
+Its values describe the finalized historical return sample, not future losses.
+A monetary equivalent multiplies the return-space statistic by ending net NAV;
+it is not a realized historical loss.
+
+## Portfolio evolution in Risk Lab
+
+Risk Lab no longer treats `asset_returns @ constant_weights` as a generic
+portfolio history. That arithmetic is retained only as the explicitly labeled
+zero-cost **Daily Rebalanced — legacy constant-weight** policy. The selected
+policy is applied by the pure Portfolio Path V1 engine:
+
+- **Buy & Hold:** quantities established at launch remain fixed; weights drift.
+- **Daily rebalance:** every later complete observation resets post-cost weights
+  to target.
+- **Weekly:** theoretical UTC `W-SUN` boundary.
+- **Monthly/quarterly:** theoretical UTC calendar month-end/quarter-end.
+
+At launch, `quantity_i = initial_capital * weight_i / launch_price_i`. The
+allocation is treated as already established, so V1 charges no setup cost. On a
+later date, old quantities are marked at that complete close before any trade.
+If scheduled, a rebalance executes at that close; its new quantities affect the
+next return interval, never the interval that just ended. Close execution is an
+idealized research mark, not evidence of an executable fill.
+
+The event calendar is generated independently of observed price dates. A
+missing scheduled date can therefore never be replaced by an earlier observed
+date. Missing prices are not forward-filled for the path. An absent boundary or
+a scheduled row with an incomplete cross-asset close is retained as pending,
+then executed on the first later complete observation with both scheduled and
+effective dates recorded. When several scheduled boundaries are pending before
+that observation, the engine records every boundary but coalesces them into one
+target-reset trade and one transaction-cost charge. V1 stateful paths are
+long-only and unlevered because margin, borrow, funding and short-sale cash flows
+are not modeled.
+
+Asset-level drawdown uses initial wealth `1.0` as the launch peak. Therefore a
+first-period loss is visible immediately: returns `[-20%, +12.5%]` produce
+drawdowns `[-20%, -10%]`, not `[0%, 0%]`. Stateful NAV-path drawdown uses the
+same launch-peak convention and is not reconstructed from a separate return
+series.
+
+For combined commission and slippage rate `k`:
+
+```text
+k = (commission_bps + slippage_bps) / 10_000
+gross_traded_notional = sum(abs(trade_value_i))
+transaction_cost = k * gross_traded_notional
+one_way_turnover = 0.5 * gross_turnover
+```
+
+Post-cost NAV is solved jointly with the target allocation so reported
+post-trade weights still sum to the requested target. Portfolio and asset
+exports carry policy, target/initial weights, event convention, costs, missing-
+price rule and `portfolio-path-v1` provenance.
+
+Risk Summary CSV is a long-form contract with columns `Record Type`, `Section`,
+`Name`, `Value`, `Display Value`, `Unit`, and `Sample Size`. `Value` preserves
+the raw machine-readable number when one exists; `Display Value` is the exact
+human-facing representation. Context, visible metrics, data-quality counts and
+details, excluded provisional dates, rebalance audit, methodology, target
+weights, costs, source, and date bounds are exported from the same immutable
+summary object rendered in the application.
+
 ## VaR and CVaR
 
 At confidence level `c`, the implementation evaluates the left tail at
@@ -50,7 +138,8 @@ horizon constructions.
 
 | Component | Construction | Main limitation |
 |---|---|---|
-| Headline scaled risk | Daily estimate scaled by `sqrt(h)` | i.i.d. approximation |
+| Portfolio path | Stateful quantities under the selected rebalance calendar | Idealized close execution; proportional costs only |
+| Risk Summary | Finalized selected-policy net path and return sample | Retrospective only; source/calendar quality limits daily labels |
 | Distribution diagnostics | Realized rolling h-period returns | Overlapping observations |
 | VaR backtesting | Rolling historical estimate versus forward realized h-period return | Independence depends on stepping mode |
 | Historical optimization scenarios | Rolling h-period asset returns with equal scenario probability | Overlapping observations |
@@ -59,6 +148,23 @@ horizon constructions.
 | Robust covariance | Estimated from daily returns; volatility may be displayed at `sqrt(h)` | Daily dependence may not persist |
 | Monitoring realized volatility | Expanding sample standard deviation of eligible one-calendar-day post-launch Simple returns, annualized with `sqrt(365)` | Short sample; excludes multi-day gaps |
 | Monitoring risk forecast | Origin-safe estimate for a stored future target using current drifted weights | Overlap and estimation uncertainty |
+
+The risk horizon never determines the rebalance calendar. Headline Money
+VaR/CVaR described as current risk multiplies return-space risk by the latest
+net policy NAV and records that NAV's date/type; initial capital remains a
+separate launch notional.
+
+The Robust Assumptions comparison reads the completed transparency table; it
+does not rebuild any estimator. By default, every available estimator and the
+exact Final E[r] passed downstream appear in one asset band. The connector spans
+`max(available estimates) - min(available estimates)`, and optional dispersion
+sorting uses that full range. Deterministic vertical marker offsets resolve
+equal x-values without modifying the assumptions. Pairwise mode retains Raw
+Historical Mean as its fixed first endpoint. Displayed percentage points are the
+table's decimal returns multiplied by 100; signed basis-point differences are
+`(estimate - mean) * 10,000`. Missing Manual Views remain unavailable rather
+than becoming zero. The figure is an assumption-sensitivity audit, not an
+expected-performance forecast.
 
 ## Backtesting
 
@@ -107,6 +213,11 @@ All scenario returns and simulated wealth-path innovations are represented as
 Simple returns. The public scenario and optimization boundaries reject a Log
 input declaration rather than applying incompatible arithmetic.
 
+Monte Carlo current-exposure aggregation and the optimizer's `Current`
+comparator use end-of-path weights available at the Risk Lab cutoff. Historical
+VaR backtesting consumes the sequential realized returns produced by the
+selected policy; it does not apply final-period weights retrospectively.
+
 Before Normal or Student-t simulation, the covariance input is checked for
 labels, finite values, symmetry, eigenvalues, and conditioning. The default
 policy repairs a numerically invalid matrix in correlation space while
@@ -143,9 +254,12 @@ be described as out-of-sample performance or as the unique best portfolio.
 
 ## Portfolio experiment monitoring
 
-Historical OOS and Hybrid experiments rebuild optimization from observations no
-later than `optimization_as_of`; Live Forward freezes its snapshot at creation.
-Launch occurs on the declared next complete observation, launch NAV equals
+New experiments freeze manually entered positive long-only weights totaling 100%
+without optimization, expected-return fitting, scenario generation or silent
+normalization. The user-selected completed launch day requires complete prices.
+Legacy internal `optimization_as_of` means the allocation decision date in this
+manual workflow; historical weight selection may still contain hindsight bias.
+Launch NAV equals
 initial capital, and launch return is zero. Post-launch quantities are fixed and
 Simple-return wealth arithmetic is used. Price moves create current-weight
 drift; no rebalancing is performed.

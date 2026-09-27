@@ -13,7 +13,7 @@ dependencies = [
     "pandas>=2.0,<3",
     "numpy>=1.25,<3",
     "scipy>=1.11,<2",
-    "matplotlib>=3.7,<4",
+    "plotly>=6.9,<7",
     "requests>=2.31,<3",
     "PyYAML>=6.0,<7",
     "yfinance>=0.2.36,<2",
@@ -29,7 +29,6 @@ qcprf-monitor = "var_cvar_crypto_risk.monitoring.cli:main"
 [project.optional-dependencies]
 app = [
     "streamlit>=1.32,<2",
-    "plotly>=6.9,<7",
 ]
 dev = [
     "build>=1.2,<2",

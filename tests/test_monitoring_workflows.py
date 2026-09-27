@@ -19,9 +19,8 @@ from var_cvar_crypto_risk.monitoring.domain import (
 from var_cvar_crypto_risk.monitoring.models import Base
 from var_cvar_crypto_risk.monitoring.prices import normalize_monitoring_prices
 from var_cvar_crypto_risk.monitoring.recipes import (
-    OptimizationRecipe,
+    ManualMonitoringRecipe,
     RiskMonitoringRecipe,
-    ScenarioRecipe,
     SourceRecipe,
 )
 from var_cvar_crypto_risk.monitoring.repository import SqlAlchemyUnitOfWork
@@ -51,8 +50,8 @@ def test_live_creation_freezes_cutoff_and_persists_only_launch_state(
     def uow_factory():
         return SqlAlchemyUnitOfWork(session_factory)
 
-    recipe = OptimizationRecipe(
-        scenario=ScenarioRecipe(source="historical", horizon_days=1),
+    recipe = ManualMonitoringRecipe(
+        weights={"BTC": 0.60, "ETH": 0.40},
         risk=RiskMonitoringRecipe(horizon_days=1, estimation_window=4),
         source=SourceRecipe(
             provider="fixture",
@@ -88,18 +87,17 @@ def test_live_creation_freezes_cutoff_and_persists_only_launch_state(
         assert result.experiment.status is ExperimentStatus.ACTIVE
         assert result.historical_replay is None
         with uow_factory() as uow:
-            snapshot = uow.snapshots.get_for_experiment(
-                result.experiment.experiment_id
-            )
+            snapshot = uow.snapshots.get_for_experiment(result.experiment.experiment_id)
             states = uow.valuations.list(result.experiment.experiment_id)
             forecasts = uow.forecasts.list(result.experiment.experiment_id)
             prices = uow.prices.list(source="fixture")
             events = uow.events.list(result.experiment.experiment_id)
         assert snapshot is not None
-        input_dates = snapshot.assumptions["input_dates"]
-        assert date.fromisoformat(input_dates["solver_input_max_date"]) <= date(
-            2026, 1, 10
-        )
+        assert snapshot.objective == "manual"
+        assert snapshot.solver == "none"
+        assert snapshot.solver_status == "manual_validated"
+        assert snapshot.assumptions["weights"] == {"BTC": 0.60, "ETH": 0.40}
+        assert snapshot.scenario_metadata["optimization_performed"] is False
         assert [state.state_date for state in states] == [date(2026, 1, 11)]
         assert states[0].daily_return == 0.0
         assert len(forecasts) == 1
