@@ -1,7 +1,7 @@
 # Quantitative Crypto Portfolio Risk Framework
 
 [![Python](https://img.shields.io/badge/Python-3.10--3.13-blue)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-1.0.0-informational)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.0.0-informational)](CHANGELOG.md)
 [![CI](https://github.com/MRezaaaaaaa/quantitative-crypto-portfolio-risk-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/MRezaaaaaaa/quantitative-crypto-portfolio-risk-framework/actions/workflows/ci.yml)
 [![Security](https://github.com/MRezaaaaaaa/quantitative-crypto-portfolio-risk-framework/actions/workflows/security.yml/badge.svg)](https://github.com/MRezaaaaaaa/quantitative-crypto-portfolio-risk-framework/actions/workflows/security.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -257,24 +257,24 @@ Dependency declarations and the committed lockfile workflow are documented in
 - Solver success is accepted only after independent numerical residual checks;
   passing those checks still does not prove economic optimality or future
   feasibility.
-- Portfolio monitoring is present on the unreleased Phase 8 development line;
-  it is not part of the tagged version 1.0.0. Rebalancing remains out of scope.
+- Portfolio monitoring is included in version 2.0.0. Rebalancing, order
+  generation and trade execution remain out of scope.
 
 See [Model risk](docs/model-risk.md) for the complete interpretation framework.
 
 ## Current release status
 
-Version `1.0.0` is the first public research release. The public repository
+Version `2.0.0` is the second public major research release and introduces the
+persistent Portfolio Monitor plus the Plotly chart contract. The public repository
 requires the supported Python test matrix, coverage/build/app checks, OpenSpec,
 CodeQL, and Dependency Review before protected-branch updates. Secret Scanning,
 Push Protection, Dependabot security updates, and Private Vulnerability
 Reporting are enabled.
 
-The included version 1.0.0 publication workflow remains a synthetic methodology
-demonstration. A separately licensed and pinned real-market dataset is required
-before an article makes market-specific empirical or performance claims.
-Phase 8 portfolio monitoring is recorded under `[Unreleased]`; implementation
-completion does not authorize a v1.1.0 bump, merge, tag, release, or deployment.
+The included publication workflow remains a synthetic methodology demonstration.
+A separately licensed and pinned real-market dataset is required before an
+article makes market-specific empirical or performance claims. Portfolio
+monitoring is research infrastructure, not a live trading or execution system.
 
 The local and CI test suites enforce an 80% package coverage floor. Coverage is
 a regression guard, not evidence that the financial models are correct.
@@ -284,6 +284,7 @@ See [CHANGELOG](CHANGELOG.md) and the specifications under `openspec/`.
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Migrating from v1.0 to v2.0](docs/migration-v2.md)
 - [Methodology and horizons](docs/methodology.md)
 - [Return conventions](docs/return-conventions.md)
 - [VaR and CVaR output contract](docs/risk-measure-contract.md)

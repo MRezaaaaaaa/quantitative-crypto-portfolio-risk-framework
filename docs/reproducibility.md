@@ -12,16 +12,18 @@ The project distinguishes three levels:
 3. **Research reproducibility** — a reader can obtain legally usable input data
    and regenerate every table or figure used in an article.
 
-Version 1.0.0 establishes a tested code baseline, a cross-platform dependency
-lock, a deterministic synthetic numerical baseline, and a config-driven
-publication workflow. The included experiment provides research
+Version 2.0.0 retains the tested cross-platform dependency lock, deterministic
+synthetic numerical baseline, and config-driven publication workflow from the
+first public release. It adds persistent monitoring provenance and explicit
+portfolio-path contracts. The included experiment provides research
 reproducibility for a synthetic methodology demonstration. A separately
 licensed, pinned real-market dataset is still required before making empirical
 claims about crypto-market behavior or performance.
 
-Phase 8 monitoring adds persistent experiment provenance on the unreleased
-development line. It does not change the version 1.0.0 publication bundle or
-convert live vendor observations into deterministic artifacts.
+Portfolio-monitoring records do not convert live vendor observations into
+deterministic publication artifacts. Reproducing a monitoring experiment also
+requires its sanitized recipe, point-in-time cutoff, source hashes and approved
+input data.
 
 ## Current workflow
 
@@ -58,8 +60,8 @@ changes across the public analytics pipeline.
 Portfolio Path V1 has separate deterministic contract tests for fixed
 quantities, drift, UTC event dates, cost accounting, missing-price deferral and
 zero-cost equivalence to the legacy daily constant-weight series. These tests
-are not silently folded into the version-1.0 numerical golden file because the
-new methodology has explicit versioned provenance.
+are not silently folded into the core numerical golden file because the new
+methodology has explicit versioned provenance.
 
 Periodic-path tests generate theoretical UTC weekly/monthly/quarterly
 boundaries independently of the observed index. They cover absent and incomplete

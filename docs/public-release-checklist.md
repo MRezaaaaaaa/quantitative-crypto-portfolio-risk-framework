@@ -129,4 +129,4 @@ release review must additionally confirm:
       approved inputs and disclose fixed holdings, missing costs, source quality,
       no rebalancing, and no performance guarantee.
 - [ ] The candidate changelog and version are reviewed in a separate release
-      commit. Until then, Phase 8 remains under `[Unreleased]`.
+      commit before any tag or GitHub Release is created.
