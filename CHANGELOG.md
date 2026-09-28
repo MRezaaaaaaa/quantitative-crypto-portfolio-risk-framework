@@ -5,6 +5,17 @@ is based on Keep a Changelog, and the project follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-28
+
+### Breaking Changes
+
+- Public chart builders now return `plotly.graph_objects.Figure` objects.
+  Matplotlib is no longer a runtime dependency, so downstream integrations that
+  expected Matplotlib figures must migrate to Plotly rendering or export APIs.
+- Removed the standalone `plot_tail_zoom_distribution` builder. The primary
+  interactive distribution figure now owns the historical tail overlay and
+  VaR/CVaR reference lines.
+
 ### Added
 
 - Strictly retrospective Risk Summary sourced from the finalized selected
@@ -35,9 +46,10 @@ is based on Keep a Changelog, and the project follows Semantic Versioning.
 
 - Persistent named portfolio experiments with authoritative UUIDs, validated
   lifecycle transitions, retained archive history, and event audit records.
-- Immutable point-in-time optimization snapshots containing target allocations,
-  recipes, assumptions, constraints, solver/residual state, versions, dates,
-  source hashes, and launch forecasts.
+- Immutable point-in-time allocation snapshots containing target allocations,
+  manual validation state, versions, dates, source hashes, and available launch
+  risk forecasts. Legacy optimized records remain readable without rewriting
+  their original solver and residual provenance.
 - SQLAlchemy repository/unit-of-work boundary, Alembic migrations, and a private
   local SQLite monitoring store configurable through a sanitized database URL.
 - Historical Out-of-Sample Replay that rebuilds through a frozen cutoff and
@@ -115,6 +127,8 @@ is based on Keep a Changelog, and the project follows Semantic Versioning.
 
 ### Security
 
+- Upgraded the transitive GitPython runtime from 3.1.58 to 3.1.59, resolving
+  five Dependabot advisories: one critical, two high and two medium.
 - Extended ignore and publication-boundary rules to reject monitoring databases,
   SQLite sidecars, secret-bearing database URLs, private portfolio artifacts,
   and local monitoring outputs.
@@ -237,3 +251,7 @@ is based on Keep a Changelog, and the project follows Semantic Versioning.
 - Robust expected-return, volatility, and covariance assumptions.
 - Optimizer input-governance diagnostics.
 - Horizon-aware VaR backtesting and Monte Carlo scenarios.
+
+[Unreleased]: https://github.com/MRezaaaaaaa/quantitative-crypto-portfolio-risk-framework/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/MRezaaaaaaa/quantitative-crypto-portfolio-risk-framework/compare/v1.0.0...v2.0.0
+[1.0.0]: https://github.com/MRezaaaaaaa/quantitative-crypto-portfolio-risk-framework/releases/tag/v1.0.0
